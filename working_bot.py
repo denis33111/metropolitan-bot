@@ -1301,7 +1301,7 @@ async def periodic_monthly_check(context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Main function"""
     # Get bot token
-    token = os.getenv('TELEGRAM_TOKEN')
+    token = os.getenv('BOT_TOKEN')
     if not token:
         logger.error("❌ TELEGRAM_TOKEN not found!")
         return
