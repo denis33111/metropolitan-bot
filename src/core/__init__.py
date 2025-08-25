@@ -1,1 +1,0 @@
-# Core bot functionality

@@ -26,18 +26,39 @@ class GoogleSheetsService:
     def setup_credentials(self):
         """Set up Google Sheets API credentials"""
         try:
-            # Check if we have credentials file - look in current directory for Render deployment
+            # First try environment variable (for Render.com deployment)
+            import base64
+            import json
+            
+            # Check for base64 encoded credentials in environment
+            creds_base64 = os.getenv('GOOGLE_CREDENTIALS_JSON')
+            if creds_base64:
+                try:
+                    # Decode base64 credentials
+                    creds_json = base64.b64decode(creds_base64).decode('utf-8')
+                    creds_data = json.loads(creds_json)
+                    
+                    # Use decoded credentials
+                    scopes = ['https://www.googleapis.com/auth/spreadsheets']
+                    credentials = Credentials.from_service_account_info(creds_data, scopes=scopes)
+                    self.service = build('sheets', 'v4', credentials=credentials)
+                    logger.info("✅ Google Sheets API connected with environment credentials")
+                    return
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to decode environment credentials: {e}")
+            
+            # Fallback to credentials file (for local development)
             creds_file = 'credentials.json'
             
             if os.path.exists(creds_file):
-                # Use service account credentials
+                # Use service account credentials file
                 scopes = ['https://www.googleapis.com/auth/spreadsheets']
                 credentials = Credentials.from_service_account_file(creds_file, scopes=scopes)
                 self.service = build('sheets', 'v4', credentials=credentials)
-                logger.info("✅ Google Sheets API connected with service account")
+                logger.info("✅ Google Sheets API connected with service account file")
             else:
-                # Fallback to temporary storage
-                logger.warning("⚠️ No credentials.json found - using temporary storage")
+                # No credentials found
+                logger.warning("⚠️ No credentials found - using temporary storage")
                 self.service = None
                 
         except Exception as e:
