@@ -14,9 +14,9 @@ load_dotenv()
 
 async def reset_webhook():
     """Reset the bot's webhook"""
-    token = os.getenv('TELEGRAM_TOKEN')
+    token = os.getenv('BOT_TOKEN')
     if not token:
-        print("❌ TELEGRAM_TOKEN not found!")
+        print("❌ BOT_TOKEN not found!")
         return
     
     bot = Bot(token)

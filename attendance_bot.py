@@ -24,10 +24,21 @@ logger = logging.getLogger(__name__)
 # Conversation states
 ASKING_NAME, ASKING_PHONE = range(2)
 
-# Initialize services
-spreadsheet_id = os.getenv('SPREADSHEET_ID', '11B317deOpTw1k4GgtLq8Gx0jmGA-r-npNNeXg6bPuHs')
-sheets_service = GoogleSheetsService(spreadsheet_id)
-location_service = LocationService()
+def load_config():
+    """Load all configuration in one place"""
+    config = {
+        'bot_token': os.getenv('BOT_TOKEN'),
+        'spreadsheet_id': os.getenv('SPREADSHEET_ID'),
+        'google_credentials': os.getenv('GOOGLE_CREDENTIALS_JSON')
+    }
+    
+    # Validate required values
+    if not config['bot_token']:
+        raise ValueError("BOT_TOKEN not found in environment variables!")
+    if not config['spreadsheet_id']:
+        raise ValueError("SPREADSHEET_ID not found in environment variables!")
+    
+    return config
 
 # Global variables for pending actions
 pending_actions = {}
@@ -58,6 +69,10 @@ def create_smart_keyboard(worker_name: str, current_status: str) -> ReplyKeyboar
 
 async def start_command(update: Update, context):
     """Handle /start command"""
+    # Get services from context
+    sheets_service = context.bot_data.get('sheets_service')
+    location_service = context.bot_data.get('location_service')
+    
     user = update.effective_user
     
     # Check if worker already exists
@@ -487,6 +502,7 @@ async def handle_contact(query):
 
 async def list_workers_command(update: Update, context):
     """List all workers (admin command)"""
+    sheets_service = context.bot_data.get('sheets_service')
     workers = await sheets_service.get_all_workers()
     
     if not workers:
@@ -505,6 +521,7 @@ async def list_workers_command(update: Update, context):
 
 async def office_info_command(update: Update, context):
     """Show office zone information"""
+    location_service = context.bot_data.get('location_service')
     office_info = location_service.get_office_info()
     
     message = f"""
@@ -583,6 +600,8 @@ async def return_to_main_menu(update: Update, context, user_id: int):
     """Return user to main menu after any check-in/out attempt"""
     try:
         # Get worker info
+        sheets_service = context.bot_data.get('sheets_service')
+        location_service = context.bot_data.get('location_service')
         existing_worker = await sheets_service.find_worker_by_telegram_id(user_id)
         if not existing_worker:
             return
@@ -616,6 +635,8 @@ async def return_to_main_menu(update: Update, context, user_id: int):
 async def complete_checkin(update: Update, context, pending_data: dict, location_result: dict):
     """Complete check-in after location verification"""
     try:
+        sheets_service = context.bot_data.get('sheets_service')
+        location_service = context.bot_data.get('location_service')
         worker_name = pending_data['worker_name']
         current_time = datetime.now().strftime("%H:%M")
         
@@ -653,6 +674,8 @@ async def complete_checkin(update: Update, context, pending_data: dict, location
 async def complete_checkout(update: Update, context, pending_data: dict, location_result: dict):
     """Complete check-out after location verification"""
     try:
+        sheets_service = context.bot_data.get('sheets_service')
+        location_service = context.bot_data.get('location_service')
         worker_name = pending_data['worker_name']
         current_time = datetime.now().strftime("%H:%M")
         
@@ -705,6 +728,8 @@ async def handle_persistent_keyboard(update: Update, context):
         text = update.message.text
         
         # Check if worker exists
+        sheets_service = context.bot_data.get('sheets_service')
+        location_service = context.bot_data.get('location_service')
         existing_worker = await sheets_service.find_worker_by_telegram_id(user.id)
         
         if not existing_worker:
@@ -1296,73 +1321,83 @@ async def create_next_two_months_sheets(update: Update, context: ContextTypes.DE
 
 async def periodic_monthly_check(context: ContextTypes.DEFAULT_TYPE):
     """Periodic task to check and create monthly sheets - runs once per day"""
-    await check_and_create_monthly_sheets()
+    # This function is no longer needed as monthly sheet creation is manual
+    # await check_and_create_monthly_sheets()
+    pass
 
 def main():
     """Main function"""
-    # Get bot token
-    token = os.getenv('BOT_TOKEN')
-    if not token:
-        logger.error("❌ TELEGRAM_TOKEN not found!")
-        return
-    
-    # Create application with better connection settings
-    app = Application.builder().token(token).connection_pool_size(1).build()
-    
-    # Add conversation handler for registration
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start_command)],
-        states={
-            ASKING_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name)],
-            ASKING_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone)]
-        },
-        fallbacks=[CommandHandler("cancel", cancel_registration)]
-    )
-    
-    app.add_handler(conv_handler)
-    
-    # Add admin command to list workers
-    app.add_handler(CommandHandler("workers", list_workers_command))
+    try:
+        # Load configuration
+        config = load_config()
+        token = config['bot_token']
+        
+        # Create application with better connection settings
+        app = Application.builder().token(token).connection_pool_size(1).build()
+        
+        # Initialize services
+        sheets_service = GoogleSheetsService(config['spreadsheet_id'])
+        location_service = LocationService()
+        
+        # Add services to context
+        app.bot_data['sheets_service'] = sheets_service
+        app.bot_data['location_service'] = location_service
+        
+        # Add conversation handler for registration
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("start", start_command)],
+            states={
+                ASKING_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name)],
+                ASKING_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone)]
+            },
+            fallbacks=[CommandHandler("cancel", cancel_registration)]
+        )
+        
+        app.add_handler(conv_handler)
+        
+        # Add admin command to list workers
+        app.add_handler(CommandHandler("workers", list_workers_command))
 
-    # Add admin command to show office info
-    app.add_handler(CommandHandler("office", office_info_command))
+        # Add admin command to show office info
+        app.add_handler(CommandHandler("office", office_info_command))
 
-    # Add admin command to create monthly sheets (current + next 2 months)
-    app.add_handler(CommandHandler("monthcreation", create_next_two_months_sheets))
+        # Add admin command to create monthly sheets (current + next 2 months)
+        app.add_handler(CommandHandler("monthcreation", create_next_two_months_sheets))
 
-    # Add message handler for location messages
-    app.add_handler(MessageHandler(filters.LOCATION, handle_location_message))
-    
-    # Add message handler for persistent keyboard buttons
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_persistent_keyboard))
-    
-    # Monthly sheet creation is now manual via /monthcreation command
-    # job_queue = app.job_queue
-    # job_queue.run_repeating(periodic_monthly_check, interval=86400, first=10)  # Every 24 hours (86400 seconds), start after 10 seconds
-    
-    logger.info("🤖 Starting Working Metropolitan Bot with Google Sheets and Attendance Buttons...")
-    
-    # Run the bot with retry logic
-    max_retries = 3
-    retry_count = 0
-    
-    while retry_count < max_retries:
-        try:
-            # Run the bot
-            app.run_polling(timeout=30, drop_pending_updates=True)
-            break  # If successful, exit the loop
-            
-        except Exception as e:
-            retry_count += 1
-            logger.error(f"❌ Bot connection failed (attempt {retry_count}/{max_retries}): {e}")
-            
-            if retry_count < max_retries:
-                logger.info(f"🔄 Retrying in 5 seconds...")
-                import time
-                time.sleep(5)
-            else:
-                logger.error("❌ Max retries reached. Bot failed to start.")
-                break
+        # Add message handler for location messages
+        app.add_handler(MessageHandler(filters.LOCATION, handle_location_message))
+        
+        # Add message handler for persistent keyboard buttons
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_persistent_keyboard))
+        
+        logger.info("🤖 Starting Working Metropolitan Bot with Google Sheets and Attendance Buttons...")
+        
+        # Run the bot with retry logic
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                # Run the bot
+                app.run_polling(timeout=30, drop_pending_updates=True)
+                break  # If successful, exit the loop
+                
+            except Exception as e:
+                retry_count += 1
+                logger.error(f"❌ Bot connection failed (attempt {retry_count}/{max_retries}): {e}")
+                
+                if retry_count < max_retries:
+                    logger.info(f"🔄 Retrying in 5 seconds...")
+                    import time
+                    time.sleep(5)
+                else:
+                    logger.error("❌ Max retries reached. Bot failed to start.")
+                    break
+                    
+    except ValueError as e:
+        logger.error(f"❌ Configuration error: {e}")
+    except Exception as e:
+        logger.error(f"❌ Unexpected error: {e}")
 
 if __name__ == "__main__":
     # Create logs directory

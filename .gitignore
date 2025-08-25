@@ -129,10 +129,7 @@ dmypy.json
 .pyre/
 
 # Project specific
-# QR code images (contain sensitive employee data)
-qr_codes/*.png
-qr_codes/*.jpg
-qr_codes/*.jpeg
+
 
 # Log files
 logs/*.log
