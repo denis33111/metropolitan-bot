@@ -1,5 +1,5 @@
-# Telegram Bot API
-python-telegram-bot==20.7
+# Telegram Bot API - Updated for Python 3.13 compatibility
+python-telegram-bot>=21.0
 
 # Webhook server
 aiohttp==3.9.1
