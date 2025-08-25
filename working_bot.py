@@ -39,19 +39,19 @@ def create_smart_keyboard(worker_name: str, current_status: str) -> ReplyKeyboar
         # Worker is checked in, show only check-out button
         keyboard = [
             [KeyboardButton("🚪 Check Out")],
-            [KeyboardButton("📅 My Schedule"), KeyboardButton("📞 Contact")]
+            [KeyboardButton("📅 Πρόγραμμα"), KeyboardButton("📞 Contact")]
         ]
     elif current_status == 'COMPLETE':
         # Worker completed today, show only check-in button
         keyboard = [
             [KeyboardButton("✅ Check In")],
-            [KeyboardButton("📅 My Schedule"), KeyboardButton("📞 Contact")]
+            [KeyboardButton("📅 Πρόγραμμα"), KeyboardButton("📞 Contact")]
         ]
     else:
         # Worker not checked in today, show only check-in button
         keyboard = [
             [KeyboardButton("✅ Check In")],
-            [KeyboardButton("📅 My Schedule"), KeyboardButton("📞 Contact")]
+            [KeyboardButton("📅 Πρόγραμμα"), KeyboardButton("📞 Contact")]
         ]
     
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -181,9 +181,10 @@ async def handle_button_callback(update: Update, context):
 async def handle_checkin(query, worker_name: str):
     """Handle worker check-in"""
     try:
-        # Create location request keyboard
+        # Create location request keyboard with back button
         location_keyboard = ReplyKeyboardMarkup([
-            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)]
+            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+            [KeyboardButton("🏠 Πίσω στο μενού")]
         ], resize_keyboard=True, one_time_keyboard=True)
         
         # Ask for location with automated button
@@ -195,6 +196,8 @@ async def handle_checkin(query, worker_name: str):
 **📍 Στείλε την τοποθεσία μου**
 
 **⚠️ Προσοχή:** Πρέπει να είστε μέσα σε 200m από το γραφείο!
+
+**🏠 Ή πατήστε "Πίσω στο μενού" για να ακυρώσετε**
         """
         
         # Store check-in request in global pending_actions
@@ -222,9 +225,10 @@ async def handle_checkin(query, worker_name: str):
 async def handle_checkout(query, worker_name: str):
     """Handle worker check-out"""
     try:
-        # Create location request keyboard
+        # Create location request keyboard with back button
         location_keyboard = ReplyKeyboardMarkup([
-            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)]
+            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+            [KeyboardButton("🏠 Πίσω στο μενού")]
         ], resize_keyboard=True, one_time_keyboard=True)
         
         # Ask for location with automated button
@@ -236,6 +240,8 @@ async def handle_checkout(query, worker_name: str):
 **📍 Στείλε την τοποθεσία μου**
 
 **⚠️ Προσοχή:** Πρέπει να είστε μέσα σε 200m από το γραφείο!
+
+**🏠 Ή πατήστε "Πίσω στο μενού" για να ακυρώσετε**
         """
         
         # Store check-out request in global pending_actions
@@ -538,6 +544,8 @@ async def handle_location_message(update: Update, context):
         # Get location from message
         if not update.message.location:
             await update.message.reply_text("❌ Παρακαλώ στείλτε την τοποθεσία σας (location), όχι κείμενο.")
+            # Return to main menu even for invalid location
+            await return_to_main_menu(update, context, user_id)
             return
         
         location = update.message.location
@@ -548,9 +556,12 @@ async def handle_location_message(update: Update, context):
         location_result = location_service.is_within_office_zone(latitude, longitude)
         
         if not location_result['is_within']:
-            # Location outside zone
+            # Location outside zone - show error and return to main menu
             location_msg = location_service.format_location_message(location_result)
             await update.message.reply_text(location_msg, parse_mode='Markdown')
+            
+            # IMPORTANT: Return to main menu after failed location check
+            await return_to_main_menu(update, context, user_id)
             return
         
         # Location verified, proceed with action
@@ -565,6 +576,42 @@ async def handle_location_message(update: Update, context):
     except Exception as e:
         logger.error(f"Error handling location message: {e}")
         await update.message.reply_text("❌ Σφάλμα κατά την επεξεργασία της τοποθεσίας.")
+        # Return to main menu even on error
+        await return_to_main_menu(update, context, user_id)
+
+async def return_to_main_menu(update: Update, context, user_id: int):
+    """Return user to main menu after any check-in/out attempt"""
+    try:
+        # Get worker info
+        existing_worker = await sheets_service.find_worker_by_telegram_id(user_id)
+        if not existing_worker:
+            return
+        
+        worker_name = existing_worker['name']
+        
+        # Get current attendance status
+        attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
+        current_status = attendance_status['status']
+        
+        # Create smart keyboard based on current status
+        smart_keyboard = create_smart_keyboard(worker_name, current_status)
+        
+        # Show main menu message
+        menu_msg = f"""
+🏠 **Επιστροφή στο κύριο μενού**
+
+**Καλώς ήρθατε, {worker_name}!**
+
+**Χρησιμοποιήστε τα κουμπιά κάτω από το πεδίο εισαγωγής:**
+        """
+        
+        # Send message with smart keyboard
+        await update.message.reply_text(menu_msg, parse_mode='Markdown', reply_markup=smart_keyboard)
+        
+    except Exception as e:
+        logger.error(f"Error returning to main menu: {e}")
+        # Fallback: just show basic message
+        await update.message.reply_text("🏠 Επιστροφή στο κύριο μενού. Χρησιμοποιήστε /start για να ξαναρχίσετε.")
 
 async def complete_checkin(update: Update, context, pending_data: dict, location_result: dict):
     """Complete check-in after location verification"""
@@ -674,13 +721,17 @@ async def handle_persistent_keyboard(update: Update, context):
             # Handle check-out via persistent keyboard
             await handle_persistent_checkout(update, context, worker_name)
             
-        elif text == "📅 My Schedule":
+        elif text == "📅 Πρόγραμμα":
             # Handle schedule request via persistent keyboard
             await handle_persistent_schedule(update, context, worker_name)
             
         elif text == "📞 Contact":
             # Handle contact request via persistent keyboard
             await handle_persistent_contact(update, context, worker_name)
+            
+        elif text == "🏠 Πίσω στο μενού":
+            # Handle back to menu button - return to main menu
+            await return_to_main_menu(update, context, user.id)
             
     except Exception as e:
         logger.error(f"Error handling persistent keyboard: {e}")
@@ -713,7 +764,8 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
         
         # Create location request keyboard
         location_keyboard = ReplyKeyboardMarkup([
-            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)]
+            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+            [KeyboardButton("🏠 Πίσω στο μενού")]
         ], resize_keyboard=True, one_time_keyboard=True)
         
         # Store check-in request in global pending_actions
@@ -771,7 +823,8 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
         
         # Create location request keyboard
         location_keyboard = ReplyKeyboardMarkup([
-            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)]
+            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+            [KeyboardButton("🏠 Πίσω στο μενού")]
         ], resize_keyboard=True, one_time_keyboard=True)
         
         # Store check-out request in global pending_actions
