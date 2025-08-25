@@ -26,8 +26,8 @@ class GoogleSheetsService:
     def setup_credentials(self):
         """Set up Google Sheets API credentials"""
         try:
-            # Check if we have credentials file
-            creds_file = os.path.join(os.path.dirname(__file__), '..', '..', 'credentials.json')
+            # Check if we have credentials file - look in current directory for Render deployment
+            creds_file = 'credentials.json'
             
             if os.path.exists(creds_file):
                 # Use service account credentials
