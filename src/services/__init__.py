@@ -1,1 +1,1 @@
-# Bot services
+# Metropolitan Bot Services Package
