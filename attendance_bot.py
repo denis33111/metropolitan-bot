@@ -1627,29 +1627,24 @@ async def attendance_command(update: Update, context):
                 await update.message.reply_text("❌ Could not read schedule data.")
                 return
             
-            # Find today's column (Row 3 has dates, Row 4 has day names)
+            # Find today's column using Row 3 dates (much simpler and more reliable)
             today_col = None
-            day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
             
-            # Look for today's column in Row 3 (dates) or Row 4 (day names)
-            for row_idx in [3, 4]:  # Check both rows
-                if row_idx < len(schedule_values):
-                    row = schedule_values[row_idx]
-                    for col_idx, cell in enumerate(row[1:8]):  # Columns B-H
-                        if str(cell).strip():
-                            if row_idx == 3:  # Row 3 has dates
-                                try:
-                                    # Try to parse date and check if it's today
-                                    cell_date = datetime.strptime(str(cell), "%m/%d/%Y")
-                                    if cell_date.date() == today.date():
-                                        today_col = col_idx + 1  # +1 because we skipped column A
-                                        break
-                                except:
-                                    pass
-                            elif row_idx == 4:  # Row 4 has day names
-                                if str(cell).strip() == today_name:
-                                    today_col = col_idx + 1
-                                    break
+            # Row 3 contains the actual dates
+            if len(schedule_values) > 2:  # Make sure Row 3 exists
+                row_3 = schedule_values[2]  # Row 3 (index 2)
+                for col_idx, cell in enumerate(row_3[1:8]):  # Columns B-H
+                    if str(cell).strip():
+                        try:
+                            # Parse the date from Row 3
+                            cell_date = datetime.strptime(str(cell), "%m/%d/%Y")
+                            if cell_date.date() == today.date():
+                                today_col = col_idx + 1  # +1 because we skipped column A
+                                logger.info(f"📅 Found today's column: {col_idx + 1} for date {cell_date.date()}")
+                                break
+                        except Exception as e:
+                            logger.warning(f"⚠️ Could not parse date from cell: {cell} - {e}")
+                            continue
             
             if today_col is None:
                 await update.message.reply_text("❌ Could not determine today's schedule column.")
