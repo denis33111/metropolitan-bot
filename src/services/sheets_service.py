@@ -74,7 +74,14 @@ class GoogleSheetsService:
         """Get today's column letter (B=1st, C=2nd, etc.)"""
         day = datetime.now().day
         # Column A is names, so day 1 = column B, day 2 = column C, etc.
-        return chr(ord('A') + day)
+        # Handle days beyond 26 (Z) by using AA, AB, AC, etc.
+        if day <= 26:
+            return chr(ord('A') + day)
+        else:
+            # For days 27-31, use AA, AB, AC, AD, AE
+            first_letter = 'A'
+            second_letter = chr(ord('A') + (day - 26))
+            return first_letter + second_letter
     
     async def ensure_monthly_sheet_exists(self) -> bool:
         """Ensure current month's sheet exists, create if needed"""
