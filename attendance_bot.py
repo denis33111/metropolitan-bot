@@ -1619,16 +1619,20 @@ async def attendance_command(update: Update, context):
         today_name = today.strftime("%A")  # Monday, Tuesday, etc.
         
         # Get current week schedule to see who should work today
+        logger.info(f"🔍 DEBUG STEP 3: Getting active week sheet for date: {current_date}")
         current_week_sheet = sheets_service.get_active_week_sheet(current_date)
+        logger.info(f"🔍 DEBUG STEP 3: Active week sheet returned: {current_week_sheet}")
         
         # Read schedule sheet to get today's column and who should work
         try:
+            logger.info(f"🔍 DEBUG STEP 4: Reading schedule sheet: {current_week_sheet}")
             schedule_result = sheets_service.service.spreadsheets().values().get(
                 spreadsheetId=sheets_service.spreadsheet_id,
                 range=f'{current_week_sheet}!A:Z'
             ).execute()
             
             schedule_values = schedule_result.get('values', [])
+            logger.info(f"🔍 DEBUG STEP 4: Schedule sheet rows returned: {len(schedule_values)}")
             if not schedule_values or len(schedule_values) < 4:
                 await update.message.reply_text("❌ Could not read schedule data.")
                 return
@@ -1639,14 +1643,16 @@ async def attendance_command(update: Update, context):
             # Row 3 contains the actual dates
             if len(schedule_values) > 2:  # Make sure Row 3 exists
                 row_3 = schedule_values[2]  # Row 3 (index 2)
+                logger.info(f"🔍 DEBUG STEP 5: Row 3 (dates) content: {row_3}")
                 for col_idx, cell in enumerate(row_3[1:8]):  # Columns B-H
                     if str(cell).strip():
                         try:
                             # Parse the date from Row 3
                             cell_date = datetime.strptime(str(cell), "%m/%d/%Y")
+                            logger.info(f"🔍 DEBUG STEP 5: Parsed date from cell {col_idx+1}: {cell_date.date()}")
                             if cell_date.date() == today.date():
                                 today_col = col_idx + 1  # +1 because we skipped column A
-                                logger.info(f"📅 Found today's column: {col_idx + 1} for date {cell_date.date()}")
+                                logger.info(f"🔍 DEBUG STEP 5: Found today's column: {col_idx + 1} for date {cell_date.date()}")
                                 break
                         except Exception as e:
                             logger.warning(f"⚠️ Could not parse date from cell: {cell} - {e}")
@@ -1657,34 +1663,48 @@ async def attendance_command(update: Update, context):
                 return
             
             # Get who should work today and their schedules
+            logger.info(f"🔍 DEBUG STEP 6: Looking for employees in column {today_col}")
             today_schedules = {}
             for row in schedule_values[5:]:  # Start from row 5 (employee names)
                 if len(row) > 0 and row[0] and today_col < len(row):
                     employee_name = row[0]
                     schedule = row[today_col] if row[today_col] else ""
+                    logger.info(f"🔍 DEBUG STEP 6: Employee {employee_name} has schedule: '{schedule}'")
                     if schedule and schedule.strip() and schedule.strip().upper() not in ['REST', 'OFF', '']:
                         today_schedules[employee_name] = schedule
+                        logger.info(f"🔍 DEBUG STEP 6: Added {employee_name} to today's schedules")
+            
+            logger.info(f"🔍 DEBUG STEP 6: Total employees scheduled today: {len(today_schedules)}")
+            logger.info(f"🔍 DEBUG STEP 6: Today's schedules: {today_schedules}")
             
             if not today_schedules:
                 await update.message.reply_text("📅 No one scheduled to work today.")
                 return
             
             # Now read monthly sheet to get today's attendance
+            logger.info(f"🔍 DEBUG STEP 7: Getting monthly sheet name")
             monthly_sheet = sheets_service.get_current_month_sheet_name()
+            logger.info(f"🔍 DEBUG STEP 7: Monthly sheet name: {monthly_sheet}")
+            
+            logger.info(f"🔍 DEBUG STEP 7: Getting today's column letter")
             today_column_letter = sheets_service.get_today_column_letter()
+            logger.info(f"🔍 DEBUG STEP 7: Today's column letter: {today_column_letter}")
             
             try:
+                logger.info(f"🔍 DEBUG STEP 7: Reading monthly sheet range: {monthly_sheet}!A:{today_column_letter}")
                 attendance_result = sheets_service.service.spreadsheets().values().get(
                     spreadsheetId=sheets_service.spreadsheet_id,
                     range=f'{monthly_sheet}!A:{today_column_letter}'
                 ).execute()
                 
                 attendance_values = attendance_result.get('values', [])
+                logger.info(f"🔍 DEBUG STEP 8: Monthly sheet rows returned: {len(attendance_values)}")
                 if not attendance_values:
                     await update.message.reply_text("❌ Could not read attendance data.")
                     return
                 
                 # Find today's column in monthly sheet
+                logger.info(f"🔍 DEBUG STEP 8: Row 1 (dates) content: {attendance_values[0] if attendance_values else 'EMPTY'}")
                 today_monthly_col = None
                 for col_idx, cell in enumerate(attendance_values[0]):  # Row 1 has dates
                     if str(cell).strip():
@@ -1692,31 +1712,42 @@ async def attendance_command(update: Update, context):
                             # Parse date format (DD/MM)
                             if '/' in str(cell):
                                 day, month = str(cell).split('/')
+                                logger.info(f"🔍 DEBUG STEP 8: Parsed date from cell {col_idx}: day={day}, month={month}")
                                 if int(day) == today.day and int(month) == today.month:
                                     today_monthly_col = col_idx
+                                    logger.info(f"🔍 DEBUG STEP 8: Found today's column: {col_idx} for date {day}/{month}")
                                     break
-                        except:
+                        except Exception as e:
+                            logger.warning(f"🔍 DEBUG STEP 8: Error parsing cell {col_idx}: {cell} - {e}")
                             pass
                 
+                logger.info(f"🔍 DEBUG STEP 8: Today's monthly column: {today_monthly_col}")
                 if today_monthly_col is None:
                     await update.message.reply_text("❌ Could not find today's column in monthly sheet.")
                     return
                 
                 # Get attendance status for each scheduled employee
+                logger.info(f"🔍 DEBUG STEP 9: Starting attendance check for {len(today_schedules)} employees")
                 attendance_report = {
                     'checked_in': [],
                     'not_checked_in': []
                 }
                 
                 for employee_name in today_schedules.keys():
+                    logger.info(f"🔍 DEBUG STEP 9: Checking attendance for {employee_name}")
                     # Find employee row in monthly sheet
                     employee_found = False
-                    for row in attendance_values[1:]:  # Skip header row
+                    for row_idx, row in enumerate(attendance_values[1:]):  # Skip header row
                         if len(row) > 0 and row[0] == employee_name:
                             employee_found = True
+                            logger.info(f"🔍 DEBUG STEP 9: Found {employee_name} at row {row_idx+2}")
+                            logger.info(f"🔍 DEBUG STEP 9: Row content: {row}")
+                            logger.info(f"🔍 DEBUG STEP 9: Looking in column {today_monthly_col}, row length: {len(row)}")
+                            
                             if today_monthly_col < len(row) and row[today_monthly_col]:
                                 check_in_time = row[today_monthly_col]
                                 schedule_time = today_schedules[employee_name]
+                                logger.info(f"🔍 DEBUG STEP 9: {employee_name} CHECKED IN at {check_in_time}")
                                 
                                 # Determine if late or on time
                                 try:
@@ -1744,6 +1775,7 @@ async def attendance_command(update: Update, context):
                                                     'status': status,
                                                     'schedule': schedule_time
                                                 })
+                                                logger.info(f"🔍 DEBUG STEP 9: Added {employee_name} to checked_in with status: {status}")
                                             else:
                                                 attendance_report['checked_in'].append({
                                                     'name': employee_name,
@@ -1765,7 +1797,8 @@ async def attendance_command(update: Update, context):
                                             'status': "Unknown",
                                             'schedule': schedule_time
                                         })
-                                except:
+                                except Exception as e:
+                                    logger.warning(f"🔍 DEBUG STEP 9: Error processing check-in for {employee_name}: {e}")
                                     attendance_report['checked_in'].append({
                                         'name': employee_name,
                                         'time': check_in_time,
@@ -1774,6 +1807,7 @@ async def attendance_command(update: Update, context):
                                     })
                             else:
                                 # Not checked in
+                                logger.info(f"🔍 DEBUG STEP 9: {employee_name} NOT CHECKED IN (column {today_monthly_col} empty or out of range)")
                                 attendance_report['not_checked_in'].append({
                                     'name': employee_name,
                                     'schedule': today_schedules[employee_name]
@@ -1781,10 +1815,13 @@ async def attendance_command(update: Update, context):
                             break
                     
                     if not employee_found:
+                        logger.info(f"🔍 DEBUG STEP 9: {employee_name} NOT FOUND in monthly sheet")
                         attendance_report['not_checked_in'].append({
                             'name': employee_name,
                             'schedule': today_schedules[employee_name]
                         })
+                
+                logger.info(f"🔍 DEBUG STEP 9: Final attendance report: {attendance_report}")
                 
                 # Generate the report
                 report = f"📊 **TODAY'S ATTENDANCE** ({today.strftime('%d/%m/%Y')})\n\n"
