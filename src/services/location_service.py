@@ -6,6 +6,7 @@ Handles location verification for check-in/out
 
 import logging
 import math
+import os
 from typing import Dict, Tuple
 
 logger = logging.getLogger(__name__)
@@ -14,10 +15,10 @@ class LocationService:
     """Service for location verification"""
     
     def __init__(self):
-        # Office coordinates (Athens area)
-        self.office_latitude = 37.909471
-        self.office_longitude = 23.871240
-        self.office_radius_meters = 200
+        # Office coordinates from environment variables
+        self.office_latitude = float(os.getenv('OFFICE_LATITUDE', '37.924917'))
+        self.office_longitude = float(os.getenv('OFFICE_LONGITUDE', '23.931444'))
+        self.office_radius_meters = int(os.getenv('OFFICE_RADIUS_METERS', '500'))
         
         logger.info(f"📍 Office zone set: {self.office_latitude}, {self.office_longitude} (radius: {self.office_radius_meters}m)")
     
