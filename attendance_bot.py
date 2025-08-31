@@ -585,6 +585,14 @@ async def handle_location_message(update: Update, context):
         latitude = location.latitude
         longitude = location.longitude
         
+        # Get services from context
+        location_service = context.bot_data.get('location_service')
+        if not location_service:
+            logger.error("Location service not available in context")
+            await update.message.reply_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία τοποθεσίας.")
+            await return_to_main_menu(update, context, user_id)
+            return
+            
         # Verify location is within office zone
         location_result = location_service.is_within_office_zone(latitude, longitude)
         
@@ -816,19 +824,11 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
             'timestamp': datetime.now()
         }
         
-        # Show location request message with automated button
+        # Show minimal location request message
         await update.message.reply_text(
             f"📍 **Check-in για {worker_name}**\n\n"
-            "**Για να κάνετε check-in, πατήστε το κουμπί παρακάτω:**\n\n"
-            "**📍 Στείλε την τοποθεσία μου**\n\n"
-            "**⚠️ Προσοχή:** Πρέπει να είστε μέσα σε 200m από το γραφείο!\n\n"
-            "**🔄 ΜΗΝ πατάτε ξανά το κουμπί Check In - χρησιμοποιήστε μόνο το κουμπί τοποθεσίας!**",
-            parse_mode='Markdown'
-        )
-        
-        # Send the location request keyboard
-        await update.message.reply_text(
-            "**Πατήστε το κουμπί για να στείλετε την τοποθεσία σας:**",
+            "**Πατήστε το κουμπί τοποθεσίας παρακάτω:**\n\n"
+            "⚠️ Πρέπει να είστε μέσα σε 200m από το γραφείο",
             reply_markup=location_keyboard,
             parse_mode='Markdown'
         )
@@ -875,19 +875,11 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
             'timestamp': datetime.now()
         }
         
-        # Show location request message with automated button
+        # Show minimal location request message
         await update.message.reply_text(
             f"🚪 **Check-out για {worker_name}**\n\n"
-            "**Για να κάνετε check-out, πατήστε το κουμπί παρακάτω:**\n\n"
-            "**📍 Στείλε την τοποθεσία μου**\n\n"
-            "**⚠️ Προσοχή:** Πρέπει να είστε μέσα σε 200m από το γραφείο!\n\n"
-            "**🔄 ΜΗΝ πατάτε ξανά το κουμπί Check Out - χρησιμοποιήστε μόνο το κουμπί τοποθεσίας!**",
-            parse_mode='Markdown'
-        )
-        
-        # Send the location request keyboard
-        await update.message.reply_text(
-            "**Πατήστε το κουμπί για να στείλετε την τοποθεσία σας:**",
+            "**Πατήστε το κουμπί τοποθεσίας παρακάτω:**\n\n"
+            "⚠️ Πρέπει να είστε μέσα σε 200m από το γραφείο",
             reply_markup=location_keyboard,
             parse_mode='Markdown'
         )
