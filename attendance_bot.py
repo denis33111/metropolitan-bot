@@ -13,6 +13,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from src.services.sheets_service import GoogleSheetsService
 from src.services.location_service import LocationService
+import aiohttp
+from aiohttp import web
 
 # Load environment variables
 load_dotenv()
@@ -1325,6 +1327,25 @@ async def periodic_monthly_check(context: ContextTypes.DEFAULT_TYPE):
     # await check_and_create_monthly_sheets()
     pass
 
+async def webhook_handler(request):
+    """Handle incoming webhook requests from Telegram"""
+    try:
+        # Get the update from Telegram
+        update_data = await request.json()
+        update = Update.de_json(update_data, request.app['bot'])
+        
+        # Process the update
+        await request.app['application'].process_update(update)
+        
+        return web.Response(text='OK')
+    except Exception as e:
+        logger.error(f"Error processing webhook: {e}")
+        return web.Response(text='Error', status=500)
+
+async def health_check(request):
+    """Health check endpoint for Render.com"""
+    return web.Response(text='Bot is running! 🤖')
+
 def main():
     """Main function"""
     try:
@@ -1372,27 +1393,36 @@ def main():
         
         logger.info("🤖 Starting Working Metropolitan Bot with Google Sheets and Attendance Buttons...")
         
-        # Run the bot with retry logic
-        max_retries = 3
-        retry_count = 0
+        # Get port from environment (Render.com sets this)
+        port = int(os.getenv('PORT', 8080))
         
-        while retry_count < max_retries:
-            try:
-                # Run the bot
-                app.run_polling(timeout=30, drop_pending_updates=True)
-                break  # If successful, exit the loop
-                
-            except Exception as e:
-                retry_count += 1
-                logger.error(f"❌ Bot connection failed (attempt {retry_count}/{max_retries}): {e}")
-                
-                if retry_count < max_retries:
-                    logger.info(f"🔄 Retrying in 5 seconds...")
-                    import time
-                    time.sleep(5)
-                else:
-                    logger.error("❌ Max retries reached. Bot failed to start.")
-                    break
+        # Create webhook URL
+        webhook_url = f"https://metropolitan-bot.onrender.com/webhook"
+        
+        # Set up webhook
+        try:
+            app.bot.set_webhook(url=webhook_url)
+            logger.info(f"✅ Webhook set to: {webhook_url}")
+        except Exception as e:
+            logger.error(f"❌ Failed to set webhook: {e}")
+            # Fallback to polling for local development
+            logger.info("🔄 Falling back to polling mode for local development")
+            app.run_polling(timeout=30, drop_pending_updates=True)
+            return
+        
+        # Create aiohttp web application
+        web_app = web.Application()
+        web_app['bot'] = app.bot
+        web_app['application'] = app
+        
+        # Add routes
+        web_app.router.add_post('/webhook', webhook_handler)
+        web_app.router.add_get('/health', health_check)
+        web_app.router.add_get('/', health_check)
+        
+        # Start the web server
+        logger.info(f"🚀 Starting web server on port {port}")
+        web.run_app(web_app, host='0.0.0.0', port=port)
                     
     except ValueError as e:
         logger.error(f"❌ Configuration error: {e}")
