@@ -1468,6 +1468,7 @@ async def main():
 
         # Add admin command to create monthly sheets (current + next 2 months)
         app.add_handler(CommandHandler("monthcreation", create_next_two_months_sheets))
+        app.add_handler(CommandHandler("attendance", attendance_command))
 
         # Add message handler for location messages
         app.add_handler(MessageHandler(filters.LOCATION, handle_location_message))
@@ -1589,6 +1590,239 @@ async def main():
             logger.info("🧹 Final cleanup completed")
         except Exception as e:
             logger.error(f"❌ Error during final cleanup: {e}")
+
+async def attendance_command(update: Update, context):
+    """Admin command to show today's attendance overview"""
+    try:
+        user = update.effective_user
+        
+        # Check if user is admin (you)
+        if user.username != "DenisZgl" and user.id != 123456789:  # Replace with your actual Telegram ID
+            await update.message.reply_text("❌ Access denied. Admin only.")
+            return
+        
+        # Get services from context
+        sheets_service = context.bot_data.get('sheets_service')
+        if not sheets_service:
+            await update.message.reply_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
+            return
+        
+        # Get current date
+        today = datetime.now()
+        current_date = today.strftime("%-m/%-d/%Y") if today.strftime("%-m/%-d/%Y") else today.strftime("%m/%d/%Y")
+        today_name = today.strftime("%A")  # Monday, Tuesday, etc.
+        
+        # Get current week schedule to see who should work today
+        current_week_sheet = sheets_service.get_active_week_sheet(current_date)
+        
+        # Read schedule sheet to get today's column and who should work
+        try:
+            schedule_result = sheets_service.service.spreadsheets().values().get(
+                spreadsheetId=sheets_service.spreadsheet_id,
+                range=f'{current_week_sheet}!A:Z'
+            ).execute()
+            
+            schedule_values = schedule_result.get('values', [])
+            if not schedule_values or len(schedule_values) < 4:
+                await update.message.reply_text("❌ Could not read schedule data.")
+                return
+            
+            # Find today's column (Row 3 has dates, Row 4 has day names)
+            today_col = None
+            day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            
+            # Look for today's column in Row 3 (dates) or Row 4 (day names)
+            for row_idx in [3, 4]:  # Check both rows
+                if row_idx < len(schedule_values):
+                    row = schedule_values[row_idx]
+                    for col_idx, cell in enumerate(row[1:8]):  # Columns B-H
+                        if str(cell).strip():
+                            if row_idx == 3:  # Row 3 has dates
+                                try:
+                                    # Try to parse date and check if it's today
+                                    cell_date = datetime.strptime(str(cell), "%m/%d/%Y")
+                                    if cell_date.date() == today.date():
+                                        today_col = col_idx + 1  # +1 because we skipped column A
+                                        break
+                                except:
+                                    pass
+                            elif row_idx == 4:  # Row 4 has day names
+                                if str(cell).strip() == today_name:
+                                    today_col = col_idx + 1
+                                    break
+            
+            if today_col is None:
+                await update.message.reply_text("❌ Could not determine today's schedule column.")
+                return
+            
+            # Get who should work today and their schedules
+            today_schedules = {}
+            for row in schedule_values[5:]:  # Start from row 5 (employee names)
+                if len(row) > 0 and row[0] and today_col < len(row):
+                    employee_name = row[0]
+                    schedule = row[today_col] if row[today_col] else ""
+                    if schedule and schedule.strip() and schedule.strip().upper() not in ['REST', 'OFF', '']:
+                        today_schedules[employee_name] = schedule
+            
+            if not today_schedules:
+                await update.message.reply_text("📅 No one scheduled to work today.")
+                return
+            
+            # Now read monthly sheet to get today's attendance
+            monthly_sheet = sheets_service.get_current_month_sheet_name()
+            today_column_letter = sheets_service.get_today_column_letter()
+            
+            try:
+                attendance_result = sheets_service.service.spreadsheets().values().get(
+                    spreadsheetId=sheets_service.spreadsheet_id,
+                    range=f'{monthly_sheet}!A:{today_column_letter}'
+                ).execute()
+                
+                attendance_values = attendance_result.get('values', [])
+                if not attendance_values:
+                    await update.message.reply_text("❌ Could not read attendance data.")
+                    return
+                
+                # Find today's column in monthly sheet
+                today_monthly_col = None
+                for col_idx, cell in enumerate(attendance_values[0]):  # Row 1 has dates
+                    if str(cell).strip():
+                        try:
+                            # Parse date format (DD/MM)
+                            if '/' in str(cell):
+                                day, month = str(cell).split('/')
+                                if int(day) == today.day and int(month) == today.month:
+                                    today_monthly_col = col_idx
+                                    break
+                        except:
+                            pass
+                
+                if today_monthly_col is None:
+                    await update.message.reply_text("❌ Could not find today's column in monthly sheet.")
+                    return
+                
+                # Get attendance status for each scheduled employee
+                attendance_report = {
+                    'checked_in': [],
+                    'not_checked_in': []
+                }
+                
+                for employee_name in today_schedules.keys():
+                    # Find employee row in monthly sheet
+                    employee_found = False
+                    for row in attendance_values[1:]:  # Skip header row
+                        if len(row) > 0 and row[0] == employee_name:
+                            employee_found = True
+                            if today_monthly_col < len(row) and row[today_monthly_col]:
+                                check_in_time = row[today_monthly_col]
+                                schedule_time = today_schedules[employee_name]
+                                
+                                # Determine if late or on time
+                                try:
+                                    # Parse check-in time (format: HH:MM)
+                                    if ':' in str(check_in_time):
+                                        check_hour, check_minute = map(int, str(check_in_time).split(':'))
+                                        check_in_minutes = check_hour * 60 + check_minute
+                                        
+                                        # Parse schedule start time (format: HH:MM-HH:MM)
+                                        if '-' in schedule_time:
+                                            schedule_start = schedule_time.split('-')[0]
+                                            if ':' in schedule_start:
+                                                sched_hour, sched_minute = map(int, schedule_start.split(':'))
+                                                schedule_minutes = sched_hour * 60 + sched_minute
+                                                
+                                                # Determine status
+                                                if check_in_minutes <= schedule_minutes + 5:  # 5 minute grace period
+                                                    status = "On time"
+                                                else:
+                                                    status = "Late"
+                                                
+                                                attendance_report['checked_in'].append({
+                                                    'name': employee_name,
+                                                    'time': check_in_time,
+                                                    'status': status,
+                                                    'schedule': schedule_time
+                                                })
+                                            else:
+                                                attendance_report['checked_in'].append({
+                                                    'name': employee_name,
+                                                    'time': check_in_time,
+                                                    'status': "Unknown",
+                                                    'schedule': schedule_time
+                                                })
+                                        else:
+                                            attendance_report['checked_in'].append({
+                                                'name': employee_name,
+                                                'time': check_in_time,
+                                                'status': "Unknown",
+                                                'schedule': schedule_time
+                                            })
+                                    else:
+                                        attendance_report['checked_in'].append({
+                                            'name': employee_name,
+                                            'time': check_in_time,
+                                            'status': "Unknown",
+                                            'schedule': schedule_time
+                                        })
+                                except:
+                                    attendance_report['checked_in'].append({
+                                        'name': employee_name,
+                                        'time': check_in_time,
+                                        'status': "Unknown",
+                                        'schedule': schedule_time
+                                    })
+                            else:
+                                # Not checked in
+                                attendance_report['not_checked_in'].append({
+                                    'name': employee_name,
+                                    'schedule': today_schedules[employee_name]
+                                })
+                            break
+                    
+                    if not employee_found:
+                        attendance_report['not_checked_in'].append({
+                            'name': employee_name,
+                            'schedule': today_schedules[employee_name]
+                        })
+                
+                # Generate the report
+                report = f"📊 **TODAY'S ATTENDANCE** ({today.strftime('%d/%m/%Y')})\n\n"
+                
+                if attendance_report['checked_in']:
+                    report += "✅ **CHECKED IN:**\n"
+                    for employee in attendance_report['checked_in']:
+                        status_emoji = "🟢" if employee['status'] == "On time" else "🟡"
+                        report += f"• {employee['name']} - {employee['time']} ({employee['status']})\n"
+                    report += "\n"
+                
+                if attendance_report['not_checked_in']:
+                    report += "❌ **NOT CHECKED IN:**\n"
+                    for employee in attendance_report['not_checked_in']:
+                        report += f"• {employee['name']} (Scheduled: {employee['schedule']})\n"
+                
+                # Add summary
+                total_scheduled = len(today_schedules)
+                total_checked_in = len(attendance_report['checked_in'])
+                total_missing = len(attendance_report['not_checked_in'])
+                
+                report += f"\n📈 **SUMMARY:**\n"
+                report += f"• Total Scheduled: {total_scheduled}\n"
+                report += f"• Checked In: {total_checked_in}\n"
+                report += f"• Missing: {total_missing}"
+                
+                await update.message.reply_text(report, parse_mode='Markdown')
+                
+            except Exception as e:
+                logger.error(f"Error reading monthly attendance: {e}")
+                await update.message.reply_text("❌ Error reading attendance data.")
+                
+        except Exception as e:
+            logger.error(f"Error reading schedule: {e}")
+            await update.message.reply_text("❌ Error reading schedule data.")
+            
+    except Exception as e:
+        logger.error(f"Error in attendance command: {e}")
+        await update.message.reply_text("❌ Σφάλμα κατά την ανάκτηση της αναφοράς.")
 
 if __name__ == "__main__":
     # Create logs directory
