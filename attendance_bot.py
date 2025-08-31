@@ -1400,6 +1400,9 @@ def main():
         # Add message handler for persistent keyboard buttons
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_persistent_keyboard))
         
+        # Initialize the application
+        app.initialize()
+        
         logger.info("🤖 Starting Working Metropolitan Bot with Google Sheets and Attendance Buttons...")
         
         # Get port from environment (Render.com sets this)
