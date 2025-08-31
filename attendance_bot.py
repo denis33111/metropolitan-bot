@@ -1705,6 +1705,19 @@ async def attendance_command(update: Update, context):
                 
                 # Find today's column in monthly sheet
                 logger.info(f"🔍 DEBUG STEP 8: Row 1 (dates) content: {attendance_values[0] if attendance_values else 'EMPTY'}")
+                
+                # Debug Row 2 content (employee data)
+                if len(attendance_values) > 1:
+                    logger.info(f"🔍 DEBUG STEP 8: Row 2 (first employee) content: {attendance_values[1]}")
+                    logger.info(f"🔍 DEBUG STEP 8: Row 2 length: {len(attendance_values[1])}")
+                else:
+                    logger.warning(f"🔍 DEBUG STEP 8: No Row 2 found - only {len(attendance_values)} rows")
+                
+                # Debug all rows in monthly sheet
+                logger.info(f"🔍 DEBUG STEP 8: All monthly sheet rows:")
+                for row_idx, row in enumerate(attendance_values):
+                    logger.info(f"🔍 DEBUG STEP 8: Row {row_idx}: {row}")
+                
                 today_monthly_col = None
                 for col_idx, cell in enumerate(attendance_values[0]):  # Row 1 has dates
                     if str(cell).strip():
