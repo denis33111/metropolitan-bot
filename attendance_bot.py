@@ -1691,10 +1691,10 @@ async def attendance_command(update: Update, context):
             logger.info(f"🔍 DEBUG STEP 7: Today's column letter: {today_column_letter}")
             
             try:
-                logger.info(f"🔍 DEBUG STEP 7: Reading monthly sheet range: {monthly_sheet}!A:{today_column_letter}")
+                logger.info(f"🔍 DEBUG STEP 7: Reading monthly sheet range: {monthly_sheet}!A:Z (full range to find all employees)")
                 attendance_result = sheets_service.service.spreadsheets().values().get(
                     spreadsheetId=sheets_service.spreadsheet_id,
-                    range=f'{monthly_sheet}!A:{today_column_letter}'
+                    range=f'{monthly_sheet}!A:Z'
                 ).execute()
                 
                 attendance_values = attendance_result.get('values', [])
@@ -1751,10 +1751,13 @@ async def attendance_command(update: Update, context):
                                 
                                 # Determine if late or on time
                                 try:
+                                    logger.info(f"🔍 DEBUG STEP 9: Processing check-in for {employee_name}: time={check_in_time}, schedule={schedule_time}")
+                                    
                                     # Parse check-in time (format: HH:MM)
                                     if ':' in str(check_in_time):
                                         check_hour, check_minute = map(int, str(check_in_time).split(':'))
                                         check_in_minutes = check_hour * 60 + check_minute
+                                        logger.info(f"🔍 DEBUG STEP 9: Check-in time parsed: {check_hour}:{check_minute} = {check_in_minutes} minutes")
                                         
                                         # Parse schedule start time (format: HH:MM-HH:MM)
                                         if '-' in schedule_time:
@@ -1762,12 +1765,16 @@ async def attendance_command(update: Update, context):
                                             if ':' in schedule_start:
                                                 sched_hour, sched_minute = map(int, schedule_start.split(':'))
                                                 schedule_minutes = sched_hour * 60 + sched_minute
+                                                logger.info(f"🔍 DEBUG STEP 9: Schedule start parsed: {sched_hour}:{sched_minute} = {schedule_minutes} minutes")
                                                 
                                                 # Determine status
-                                                if check_in_minutes <= schedule_minutes + 5:  # 5 minute grace period
+                                                grace_period = 5
+                                                if check_in_minutes <= schedule_minutes + grace_period:
                                                     status = "On time"
+                                                    logger.info(f"🔍 DEBUG STEP 9: {employee_name} is ON TIME (check-in: {check_in_minutes}, schedule: {schedule_minutes}, grace: {grace_period})")
                                                 else:
                                                     status = "Late"
+                                                    logger.info(f"🔍 DEBUG STEP 9: {employee_name} is LATE (check-in: {check_in_minutes}, schedule: {schedule_minutes}, grace: {grace_period})")
                                                 
                                                 attendance_report['checked_in'].append({
                                                     'name': employee_name,
@@ -1777,6 +1784,7 @@ async def attendance_command(update: Update, context):
                                                 })
                                                 logger.info(f"🔍 DEBUG STEP 9: Added {employee_name} to checked_in with status: {status}")
                                             else:
+                                                logger.warning(f"🔍 DEBUG STEP 9: Could not parse schedule start time: {schedule_start}")
                                                 attendance_report['checked_in'].append({
                                                     'name': employee_name,
                                                     'time': check_in_time,
@@ -1784,6 +1792,7 @@ async def attendance_command(update: Update, context):
                                                     'schedule': schedule_time
                                                 })
                                         else:
+                                            logger.warning(f"🔍 DEBUG STEP 9: Schedule time format invalid: {schedule_time}")
                                             attendance_report['checked_in'].append({
                                                 'name': employee_name,
                                                 'time': check_in_time,
@@ -1791,6 +1800,7 @@ async def attendance_command(update: Update, context):
                                                 'schedule': schedule_time
                                             })
                                     else:
+                                        logger.warning(f"🔍 DEBUG STEP 9: Check-in time format invalid: {check_in_time}")
                                         attendance_report['checked_in'].append({
                                             'name': employee_name,
                                             'time': check_in_time,
