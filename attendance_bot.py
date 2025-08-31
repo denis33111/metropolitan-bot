@@ -1355,7 +1355,7 @@ async def health_check(request):
     """Health check endpoint for Render.com"""
     return web.Response(text='Bot is running! 🤖')
 
-def main():
+async def main():
     """Main function"""
     try:
         # Load configuration
@@ -1400,8 +1400,8 @@ def main():
         # Add message handler for persistent keyboard buttons
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_persistent_keyboard))
         
-        # Initialize the application
-        app.initialize()
+        # Initialize the application properly
+        await app.initialize()
         
         logger.info("🤖 Starting Working Metropolitan Bot with Google Sheets and Attendance Buttons...")
         
@@ -1418,18 +1418,14 @@ def main():
         try:
             logger.info(f"🔧 Setting webhook to: {webhook_url}")
             
-            # Use the proper async method
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-            webhook_result = loop.run_until_complete(app.bot.set_webhook(url=webhook_url))
+            # Use proper async calls
+            webhook_result = await app.bot.set_webhook(url=webhook_url)
             
             if webhook_result:
                 logger.info(f"✅ Webhook set successfully to: {webhook_url}")
                 
                 # Verify webhook was actually set
-                webhook_info = loop.run_until_complete(app.bot.get_webhook_info())
+                webhook_info = await app.bot.get_webhook_info()
                 if webhook_info.url == webhook_url:
                     logger.info(f"✅ Webhook verified: {webhook_info.url}")
                 else:
@@ -1477,5 +1473,6 @@ if __name__ == "__main__":
     # Create logs directory
     os.makedirs("logs", exist_ok=True)
     
-    # Run the bot
-    main()
+    # Run the bot with proper async handling
+    import asyncio
+    asyncio.run(main())
