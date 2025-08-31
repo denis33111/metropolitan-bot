@@ -1607,8 +1607,10 @@ async def attendance_command(update: Update, context):
             await update.message.reply_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
             return
         
-        # Get current date
-        today = datetime.now()
+        # Get current date in Greece timezone (GMT+3)
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
+        today = datetime.now(greece_tz)
         current_date = today.strftime("%-m/%-d/%Y") if today.strftime("%-m/%-d/%Y") else today.strftime("%m/%d/%Y")
         today_name = today.strftime("%A")  # Monday, Tuesday, etc.
         
