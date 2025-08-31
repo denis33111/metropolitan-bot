@@ -1413,9 +1413,25 @@ def main():
         
         # Set up webhook
         try:
-            webhook_result = app.bot.set_webhook(url=webhook_url)
+            logger.info(f"🔧 Setting webhook to: {webhook_url}")
+            
+            # Use the proper async method
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            webhook_result = loop.run_until_complete(app.bot.set_webhook(url=webhook_url))
+            
             if webhook_result:
                 logger.info(f"✅ Webhook set successfully to: {webhook_url}")
+                
+                # Verify webhook was actually set
+                webhook_info = loop.run_until_complete(app.bot.get_webhook_info())
+                if webhook_info.url == webhook_url:
+                    logger.info(f"✅ Webhook verified: {webhook_info.url}")
+                else:
+                    logger.error(f"❌ Webhook verification failed. Expected: {webhook_url}, Got: {webhook_info.url}")
+                    raise Exception("Webhook verification failed")
             else:
                 logger.error(f"❌ Webhook setting failed - API returned False")
                 raise Exception("Webhook API returned False")
