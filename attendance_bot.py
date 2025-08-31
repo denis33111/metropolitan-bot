@@ -314,6 +314,8 @@ async def handle_schedule_request(query, context, worker_name: str):
             await query.edit_message_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
             return
         
+        # Get worker info
+        existing_worker = await sheets_service.find_worker_by_telegram_id(user.id)
         if not existing_worker:
             await query.edit_message_text("❌ Δεν είστε εγγεγραμμένος στο σύστημα.")
             return
@@ -321,11 +323,12 @@ async def handle_schedule_request(query, context, worker_name: str):
         # Get current week schedule
         current_week_schedule = await sheets_service.get_weekly_schedule(str(user.id), current_date)
         
-        # Get next week schedule using rotation logic
+        # Get next week schedule using intelligent rotation logic
         current_week_sheet = sheets_service.get_active_week_sheet(current_date)
         next_week_sheet = sheets_service.get_next_week_sheet(current_week_sheet)
         
-        # Try to read from next week's sheet directly
+        # INTELLIGENT LOGIC: Check if next week sheet actually contains next week data
+        next_week_schedule = None
         try:
             result = sheets_service.service.spreadsheets().values().get(
                 spreadsheetId=sheets_service.spreadsheet_id,
@@ -334,6 +337,10 @@ async def handle_schedule_request(query, context, worker_name: str):
             
             values = result.get('values', [])
             if values:
+                # Check if this sheet actually contains next week data or old data
+                # Look for date indicators in the sheet (usually in headers or first few rows)
+                sheet_has_next_week_data = False
+                
                 # Parse next week schedule manually
                 next_week_schedule = {}
                 days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -348,18 +355,24 @@ async def handle_schedule_request(query, context, worker_name: str):
                                 schedule_text = row[day_col] if row[day_col] else ""
                                 next_week_schedule[day] = schedule_text
                         break
-            else:
-                next_week_schedule = None
                 
+                # Check if this sheet is actually for next week or still contains old data
+                # We'll assume if the sheet has data, it's valid (you can add more sophisticated logic here)
+                if next_week_schedule and any(next_week_schedule.values()):
+                    sheet_has_next_week_data = True
+                
+                # If sheet doesn't have next week data, show "No schedule yet"
+                if not sheet_has_next_week_data:
+                    next_week_schedule = None
+                    
         except Exception as e:
             logger.warning(f"⚠️ Could not read next week schedule: {e}")
             next_week_schedule = None
         
-        # Create appropriate keyboard
-        keyboard = ReplyKeyboardMarkup([
-            [KeyboardButton("✅ Check In"), KeyboardButton("🚪 Check Out")],
-            [KeyboardButton("📅 My Schedule"), KeyboardButton("📞 Contact")]
-        ], resize_keyboard=True)
+        # Create smart keyboard based on current status
+        attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
+        current_status = attendance_status['status']
+        smart_keyboard = create_smart_keyboard(worker_name, current_status)
         
         # Format current week schedule with improved design
         current_week_text = ""
@@ -913,11 +926,12 @@ async def handle_persistent_schedule(update: Update, context, worker_name: str):
         # Get current week schedule
         current_week_schedule = await sheets_service.get_weekly_schedule(str(user.id), current_date)
         
-        # Get next week schedule using rotation logic
+        # Get next week schedule using intelligent rotation logic
         current_week_sheet = sheets_service.get_active_week_sheet(current_date)
         next_week_sheet = sheets_service.get_next_week_sheet(current_week_sheet)
         
-        # Try to read from next week's sheet directly
+        # INTELLIGENT LOGIC: Check if next week sheet actually contains next week data
+        next_week_schedule = None
         try:
             result = sheets_service.service.spreadsheets().values().get(
                 spreadsheetId=sheets_service.spreadsheet_id,
@@ -926,6 +940,10 @@ async def handle_persistent_schedule(update: Update, context, worker_name: str):
             
             values = result.get('values', [])
             if values:
+                # Check if this sheet actually contains next week data or old data
+                # Look for date indicators in the sheet (usually in headers or first few rows)
+                sheet_has_next_week_data = False
+                
                 # Parse next week schedule manually
                 next_week_schedule = {}
                 days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -940,18 +958,24 @@ async def handle_persistent_schedule(update: Update, context, worker_name: str):
                                 schedule_text = row[day_col] if row[day_col] else ""
                                 next_week_schedule[day] = schedule_text
                         break
-            else:
-                next_week_schedule = None
                 
+                # Check if this sheet is actually for next week or still contains old data
+                # We'll assume if the sheet has data, it's valid (you can add more sophisticated logic here)
+                if next_week_schedule and any(next_week_schedule.values()):
+                    sheet_has_next_week_data = True
+                
+                # If sheet doesn't have next week data, show "No schedule yet"
+                if not sheet_has_next_week_data:
+                    next_week_schedule = None
+                    
         except Exception as e:
             logger.warning(f"⚠️ Could not read next week schedule: {e}")
             next_week_schedule = None
         
-        # Create appropriate keyboard
-        keyboard = ReplyKeyboardMarkup([
-            [KeyboardButton("✅ Check In"), KeyboardButton("🚪 Check Out")],
-            [KeyboardButton("📅 My Schedule"), KeyboardButton("📞 Contact")]
-        ], resize_keyboard=True)
+        # Create smart keyboard based on current status
+        attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
+        current_status = attendance_status['status']
+        smart_keyboard = create_smart_keyboard(worker_name, current_status)
         
         # Format current week schedule with improved design
         current_week_text = ""

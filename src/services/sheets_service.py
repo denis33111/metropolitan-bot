@@ -574,6 +574,104 @@ class GoogleSheetsService:
             return "schedule2"
         else:
             return "schedule1"
+    
+    def is_sheet_for_next_week(self, sheet_name: str, current_date_str: str) -> bool:
+        """
+        Intelligently determine if a sheet actually contains next week data
+        or still contains old data from previous weeks
+        """
+        try:
+            from datetime import datetime, timedelta
+            
+            # Parse current date
+            try:
+                current_date = datetime.strptime(current_date_str, "%-m/%-d/%Y")
+            except ValueError:
+                current_date = datetime.strptime(current_date_str, "%m/%d/%Y")
+            
+            # Calculate next week's start (Monday)
+            days_until_monday = (7 - current_date.weekday()) % 7
+            if days_until_monday == 0:  # Already Monday
+                days_until_monday = 7
+            next_monday = current_date + timedelta(days=days_until_monday)
+            
+            # Calculate the week this sheet should represent
+            # For schedule1/schedule2 rotation, we need to determine which week each sheet represents
+            # This is a simplified logic - you can enhance it based on your actual sheet naming convention
+            
+            # Get current week number
+            current_week = current_date.isocalendar()[1]
+            next_week = next_monday.isocalendar()[1]
+            
+            # Determine which sheet should contain next week data
+            if current_week % 2 == 0:  # Current week is even
+                if sheet_name == "schedule1":  # schedule1 should contain next week (odd)
+                    return next_week % 2 == 1
+                else:  # schedule2 should contain current week (even)
+                    return False
+            else:  # Current week is odd
+                if sheet_name == "schedule1":  # schedule1 should contain current week (odd)
+                    return False
+                else:  # schedule2 should contain next week (even)
+                    return next_week % 2 == 0
+                    
+        except Exception as e:
+            logger.error(f"❌ Error checking if sheet is for next week: {e}")
+            # Default to False (assume old data) if we can't determine
+            return False
+    
+    def get_intelligent_next_week_schedule(self, current_date_str: str, worker_name: str) -> Optional[Dict]:
+        """
+        Get next week schedule only if the sheet actually contains next week data
+        Returns None if the sheet contains old data
+        """
+        try:
+            current_week_sheet = self.get_active_week_sheet(current_date_str)
+            next_week_sheet = self.get_next_week_sheet(current_week_sheet)
+            
+            # Check if the next week sheet actually contains next week data
+            if not self.is_sheet_for_next_week(next_week_sheet, current_date_str):
+                logger.info(f"📅 Sheet {next_week_sheet} contains old data, not showing next week schedule")
+                return None
+            
+            # Try to read from the next week sheet
+            try:
+                result = self.service.spreadsheets().values().get(
+                    spreadsheetId=self.spreadsheet_id,
+                    range=f'{next_week_sheet}!A:Z'
+                ).execute()
+                
+                values = result.get('values', [])
+                if not values:
+                    return None
+                
+                # Parse next week schedule
+                next_week_schedule = {}
+                days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                
+                # Find the employee row by name
+                for row in values:
+                    if len(row) > 0 and row[0] == worker_name:
+                        for i, day in enumerate(days):
+                            day_col = i + 1
+                            if day_col < len(row):
+                                schedule_text = row[day_col] if row[day_col] else ""
+                                next_week_schedule[day] = schedule_text
+                        break
+                
+                # Only return if we actually have schedule data
+                if next_week_schedule and any(next_week_schedule.values()):
+                    return next_week_schedule
+                else:
+                    return None
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Could not read from {next_week_sheet}: {e}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Error getting intelligent next week schedule: {e}")
+            return None
 
     async def get_employee_schedule_for_date(self, employee_id: str, date_str: str) -> Optional[Dict]:
         """Get employee schedule for a specific date"""
