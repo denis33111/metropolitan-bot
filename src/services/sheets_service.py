@@ -643,7 +643,7 @@ class GoogleSheetsService:
             logger.error(f"❌ Error checking if sheet is for next week: {e}")
             return False
     
-    def get_intelligent_next_week_schedule(self, current_date_str: str, worker_name: str) -> Optional[Dict]:
+    async def get_intelligent_next_week_schedule(self, current_date_str: str, worker_name: str) -> Optional[Dict]:
         """
         Get next week schedule only if the sheet actually contains next week data
         Returns None if the sheet contains old data
