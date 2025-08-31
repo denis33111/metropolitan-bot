@@ -640,13 +640,7 @@ async def return_to_main_menu(update: Update, context, user_id: int):
         smart_keyboard = create_smart_keyboard(worker_name, current_status)
         
         # Show main menu message
-        menu_msg = f"""
-🏠 **Επιστροφή στο κύριο μενού**
-
-**Καλώς ήρθατε, {worker_name}!**
-
-**Χρησιμοποιήστε τα κουμπιά κάτω από το πεδίο εισαγωγής:**
-        """
+        menu_msg = f"🏠 Επιστροφή στο μενού\n\nΚαλώς ήρθατε, {worker_name}!"
         
         # Send message with smart keyboard
         await update.message.reply_text(menu_msg, parse_mode='Markdown', reply_markup=smart_keyboard)
