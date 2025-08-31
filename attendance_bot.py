@@ -432,7 +432,7 @@ async def handle_schedule_request(query, context, worker_name: str):
 **Επιλέξτε την επόμενη ενέργεια:**
         """
         
-        await query.edit_message_text(message, parse_mode='Markdown', reply_markup=keyboard)
+        await query.edit_message_text(message, parse_mode='Markdown', reply_markup=smart_keyboard)
         
     except Exception as e:
         logger.error(f"Error during schedule request: {e}")
@@ -1024,7 +1024,7 @@ async def handle_persistent_schedule(update: Update, context, worker_name: str):
 **Επιλέξτε την επόμενη ενέργεια:**
         """
         
-        await update.message.reply_text(message, parse_mode='Markdown', reply_markup=keyboard)
+        await update.message.reply_text(message, parse_mode='Markdown', reply_markup=smart_keyboard)
         
     except Exception as e:
         logger.error(f"Error during persistent schedule request: {e}")

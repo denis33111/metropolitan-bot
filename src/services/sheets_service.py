@@ -390,6 +390,7 @@ class GoogleSheetsService:
             cell_value = values[0][0] if values and values[0] else ""
             
             # Determine status
+            time = ""  # Initialize time variable
             if not cell_value:
                 status = 'NOT_CHECKED_IN'
             elif cell_value.endswith('-'):
