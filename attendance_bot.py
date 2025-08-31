@@ -146,6 +146,15 @@ async def handle_phone(update: Update, context):
     telegram_id = reg_data['telegram_id']
     name = reg_data['name']
     
+    # Get sheets service from context
+    sheets_service = context.bot_data.get('sheets_service')
+    if not sheets_service:
+        await update.message.reply_text("❌ Σφάλμα: Δεν μπορεί να βρεθεί η υπηρεσία Google Sheets.")
+        return ConversationHandler.END
+    
+    # Get services from context
+    sheets_service = context.bot_data.get('sheets_service')
+    
     # Add worker to Google Sheets
     success = await sheets_service.add_worker(telegram_id, name, phone)
     
@@ -1396,16 +1405,23 @@ def main():
         # Get port from environment (Render.com sets this)
         port = int(os.getenv('PORT', 8080))
         
-        # Create webhook URL
-        webhook_url = f"https://metropolitan-bot.onrender.com/webhook"
+        # Create webhook URL dynamically
+        render_app_name = os.getenv('RENDER_APP_NAME', 'metropolitan-bot')
+        webhook_url = f"https://{render_app_name}.onrender.com/webhook"
+        
+        logger.info(f"🚀 Attempting to set webhook to: {webhook_url}")
         
         # Set up webhook
         try:
-            app.bot.set_webhook(url=webhook_url)
-            logger.info(f"✅ Webhook set to: {webhook_url}")
+            webhook_result = await app.bot.set_webhook(url=webhook_url)
+            if webhook_result:
+                logger.info(f"✅ Webhook set successfully to: {webhook_url}")
+            else:
+                logger.error(f"❌ Webhook setting failed - API returned False")
+                raise Exception("Webhook API returned False")
+                
         except Exception as e:
             logger.error(f"❌ Failed to set webhook: {e}")
-            # Fallback to polling for local development
             logger.info("🔄 Falling back to polling mode for local development")
             app.run_polling(timeout=30, drop_pending_updates=True)
             return
@@ -1422,7 +1438,16 @@ def main():
         
         # Start the web server
         logger.info(f"🚀 Starting web server on port {port}")
-        web.run_app(web_app, host='0.0.0.0', port=port)
+        logger.info(f"🌐 Webhook endpoint: {webhook_url}")
+        logger.info(f"🏥 Health check: http://0.0.0.0:{port}/health")
+        
+        try:
+            web.run_app(web_app, host='0.0.0.0', port=port)
+        except Exception as e:
+            logger.error(f"❌ Failed to start web server: {e}")
+            # Fallback to polling
+            logger.info("🔄 Falling back to polling mode")
+            app.run_polling(timeout=30, drop_pending_updates=True)
                     
     except ValueError as e:
         logger.error(f"❌ Configuration error: {e}")
