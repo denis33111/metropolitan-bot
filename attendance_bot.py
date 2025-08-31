@@ -1457,7 +1457,18 @@ async def main():
         logger.info(f"🏥 Health check: http://0.0.0.0:{port}/health")
         
         try:
-            web.run_app(web_app, host='0.0.0.0', port=port)
+            # Use runner to avoid event loop conflicts
+            runner = web.AppRunner(web_app)
+            await runner.setup()
+            site = web.TCPSite(runner, '0.0.0.0', port)
+            await site.start()
+            
+            logger.info(f"✅ Web server started successfully on port {port}")
+            
+            # Keep the server running
+            while True:
+                await asyncio.sleep(1)
+                
         except Exception as e:
             logger.error(f"❌ Failed to start web server: {e}")
             # Fallback to polling
