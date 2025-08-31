@@ -1665,7 +1665,7 @@ async def attendance_command(update: Update, context):
             # Get who should work today and their schedules
             logger.info(f"🔍 DEBUG STEP 6: Looking for employees in column {today_col}")
             today_schedules = {}
-            for row in schedule_values[5:]:  # Start from row 5 (employee names)
+            for row in schedule_values[4:]:  # Start from row 5 (index 4) to get Αγγελος
                 if len(row) > 0 and row[0] and today_col < len(row):
                     employee_name = row[0]
                     schedule = row[today_col] if row[today_col] else ""
