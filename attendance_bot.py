@@ -352,8 +352,10 @@ async def handle_schedule_request(query, context, worker_name: str):
     try:
         from datetime import datetime, timedelta
         
-        # Get current date and format for sheets
-        today = datetime.now()
+        # Get current date and format for sheets (Greece timezone)
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
+        today = datetime.now(greece_tz)
         # Fix date format for macOS compatibility
         try:
             current_date = today.strftime("%-m/%-d/%Y")  # Format: 7/18/2025
@@ -913,8 +915,10 @@ async def handle_persistent_schedule(update: Update, context, worker_name: str):
     try:
         from datetime import datetime, timedelta
         
-        # Get current date and format for sheets
-        today = datetime.now()
+        # Get current date and format for sheets (Greece timezone)
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
+        today = datetime.now(greece_tz)
         # Fix date format for macOS compatibility
         try:
             current_date = today.strftime("%-m/%-d/%Y")  # Format: 7/18/2025

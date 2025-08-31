@@ -67,12 +67,16 @@ class GoogleSheetsService:
     
     def get_current_month_sheet_name(self) -> str:
         """Get current month sheet name in format MM_YYYY"""
-        now = datetime.now()
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
+        now = datetime.now(greece_tz)
         return f"{now.month:02d}_{now.year}"
     
     def get_today_column_letter(self) -> str:
         """Get today's column letter (B=1st, C=2nd, etc.)"""
-        day = datetime.now().day
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
+        day = datetime.now(greece_tz).day
         # Column A is names, so day 1 = column B, day 2 = column C, etc.
         # Handle days beyond 26 (Z) by using AA, AB, AC, etc.
         if day <= 26:
