@@ -1750,10 +1750,10 @@ async def attendance_command(update: Update, context):
                     logger.info(f"🔍 DEBUG STEP 9: Checking attendance for {employee_name}")
                     # Find employee row in monthly sheet
                     employee_found = False
-                    for row_idx, row in enumerate(attendance_values[1:]):  # Skip header row
+                    for row_idx, row in enumerate(attendance_values[1:]):  # Skip header row (0), start from row 1
                         if len(row) > 0 and row[0] == employee_name:
                             employee_found = True
-                            logger.info(f"🔍 DEBUG STEP 9: Found {employee_name} at row {row_idx+2}")
+                            logger.info(f"🔍 DEBUG STEP 9: Found {employee_name} at row {row_idx+1}")
                             logger.info(f"🔍 DEBUG STEP 9: Row content: {row}")
                             logger.info(f"🔍 DEBUG STEP 9: Looking in column {today_monthly_col}, row length: {len(row)}")
                             
