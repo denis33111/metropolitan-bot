@@ -1413,7 +1413,7 @@ def main():
         
         # Set up webhook
         try:
-            webhook_result = await app.bot.set_webhook(url=webhook_url)
+            webhook_result = app.bot.set_webhook(url=webhook_url)
             if webhook_result:
                 logger.info(f"✅ Webhook set successfully to: {webhook_url}")
             else:
