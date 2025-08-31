@@ -577,8 +577,8 @@ class GoogleSheetsService:
     
     def is_sheet_for_next_week(self, sheet_name: str, current_date_str: str) -> bool:
         """
-        Intelligently determine if a sheet actually contains next week data
-        or still contains old data from previous weeks
+        Intelligently determine if a sheet contains next week data
+        by checking B3 cell (Monday date) vs current week Monday
         """
         try:
             from datetime import datetime, timedelta
@@ -589,35 +589,58 @@ class GoogleSheetsService:
             except ValueError:
                 current_date = datetime.strptime(current_date_str, "%m/%d/%Y")
             
-            # Calculate next week's start (Monday)
-            days_until_monday = (7 - current_date.weekday()) % 7
-            if days_until_monday == 0:  # Already Monday
-                days_until_monday = 7
-            next_monday = current_date + timedelta(days=days_until_monday)
+            # Calculate current week Monday
+            days_since_monday = current_date.weekday()  # 0=Monday, 6=Sunday
+            current_week_monday = current_date - timedelta(days=days_since_monday)
             
-            # Calculate the week this sheet should represent
-            # For schedule1/schedule2 rotation, we need to determine which week each sheet represents
-            # This is a simplified logic - you can enhance it based on your actual sheet naming convention
+            # Calculate next week Monday
+            next_week_monday = current_week_monday + timedelta(days=7)
             
-            # Get current week number
-            current_week = current_date.isocalendar()[1]
-            next_week = next_monday.isocalendar()[1]
-            
-            # Determine which sheet should contain next week data
-            if current_week % 2 == 0:  # Current week is even
-                if sheet_name == "schedule1":  # schedule1 should contain next week (odd)
-                    return next_week % 2 == 1
-                else:  # schedule2 should contain current week (even)
+            # Read B3 cell (Monday date) from the sheet
+            try:
+                result = self.service.spreadsheets().values().get(
+                    spreadsheetId=self.spreadsheet_id,
+                    range=f'{sheet_name}!B3'
+                ).execute()
+                
+                values = result.get('values', [])
+                if not values or not values[0] or not values[0][0]:
+                    logger.warning(f"⚠️ Sheet {sheet_name} B3 is empty")
                     return False
-            else:  # Current week is odd
-                if sheet_name == "schedule1":  # schedule1 should contain current week (odd)
+                
+                # Parse B3 date
+                b3_date_str = str(values[0][0]).strip()
+                sheet_monday = None
+                
+                # Handle different date formats
+                if '/' in b3_date_str:
+                    if len(b3_date_str.split('/')) == 3:
+                        # Format: MM/DD/YYYY or DD/MM/YYYY
+                        if len(b3_date_str.split('/')[2]) == 4:  # YYYY
+                            sheet_monday = datetime.strptime(b3_date_str, "%m/%d/%Y")
+                        else:
+                            sheet_monday = datetime.strptime(b3_date_str, "%d/%m/%Y")
+                elif '-' in b3_date_str:
+                    # Format: YYYY-MM-DD
+                    sheet_monday = datetime.strptime(b3_date_str, "%Y-%m-%d")
+                
+                if not sheet_monday:
+                    logger.warning(f"⚠️ Could not parse B3 date: {b3_date_str}")
                     return False
-                else:  # schedule2 should contain next week (even)
-                    return next_week % 2 == 0
+                
+                # Compare dates
+                is_next_week = (sheet_monday.date() == next_week_monday.date())
+                
+                logger.info(f"📅 Sheet {sheet_name}: B3={sheet_monday.date()}, current_monday={current_week_monday.date()}, next_monday={next_week_monday.date()}, is_next_week={is_next_week}")
+                
+                return is_next_week
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Could not read B3 from sheet {sheet_name}: {e}")
+                return False
                     
         except Exception as e:
             logger.error(f"❌ Error checking if sheet is for next week: {e}")
-            # Default to False (assume old data) if we can't determine
             return False
     
     def get_intelligent_next_week_schedule(self, current_date_str: str, worker_name: str) -> Optional[Dict]:
@@ -629,10 +652,14 @@ class GoogleSheetsService:
             current_week_sheet = self.get_active_week_sheet(current_date_str)
             next_week_sheet = self.get_next_week_sheet(current_week_sheet)
             
+            logger.info(f"🔍 Checking next week schedule: current_sheet={current_week_sheet}, next_sheet={next_week_sheet}")
+            
             # Check if the next week sheet actually contains next week data
             if not self.is_sheet_for_next_week(next_week_sheet, current_date_str):
                 logger.info(f"📅 Sheet {next_week_sheet} contains old data, not showing next week schedule")
                 return None
+            
+            logger.info(f"✅ Sheet {next_week_sheet} contains next week data, proceeding to read schedule")
             
             # Try to read from the next week sheet
             try:
@@ -643,6 +670,7 @@ class GoogleSheetsService:
                 
                 values = result.get('values', [])
                 if not values:
+                    logger.warning(f"⚠️ Sheet {next_week_sheet} is empty")
                     return None
                 
                 # Parse next week schedule
@@ -661,8 +689,10 @@ class GoogleSheetsService:
                 
                 # Only return if we actually have schedule data
                 if next_week_schedule and any(next_week_schedule.values()):
+                    logger.info(f"✅ Found next week schedule for {worker_name}: {next_week_schedule}")
                     return next_week_schedule
                 else:
+                    logger.warning(f"⚠️ No schedule data found for {worker_name} in {next_week_sheet}")
                     return None
                     
             except Exception as e:

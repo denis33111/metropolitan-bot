@@ -15,6 +15,9 @@ from src.services.sheets_service import GoogleSheetsService
 from src.services.location_service import LocationService
 import aiohttp
 from aiohttp import web
+import psutil
+import time
+import signal
 
 # Load environment variables
 load_dotenv()
@@ -44,6 +47,58 @@ def load_config():
 
 # Global variables for pending actions
 pending_actions = {}
+
+# Add cleanup mechanism for pending actions
+async def cleanup_expired_actions():
+    """Clean up expired pending actions to prevent memory leaks"""
+    global pending_actions
+    current_time = datetime.now()
+    expired_keys = []
+    
+    for user_id, action_data in pending_actions.items():
+        # Remove actions older than 30 minutes
+        if (current_time - action_data['timestamp']).total_seconds() > 1800:
+            expired_keys.append(user_id)
+    
+    for key in expired_keys:
+        del pending_actions[key]
+    
+    if expired_keys:
+        logger.info(f"🧹 Cleaned up {len(expired_keys)} expired pending actions")
+    
+    return len(expired_keys)
+
+async def monitor_memory_usage():
+    """Monitor memory usage and log warnings"""
+    try:
+        memory = psutil.virtual_memory()
+        if memory.percent > 80:
+            logger.warning(f"⚠️ High memory usage: {memory.percent:.1f}%")
+        if memory.percent > 90:
+            logger.error(f"🚨 Critical memory usage: {memory.percent:.1f}%")
+            
+        # Log memory stats periodically
+        logger.info(f"📊 Memory: {memory.percent:.1f}% used, {memory.available / 1024 / 1024 / 1024:.1f}GB available")
+        
+    except Exception as e:
+        logger.error(f"❌ Error monitoring memory: {e}")
+
+# Add periodic cleanup task
+async def periodic_cleanup(context: ContextTypes.DEFAULT_TYPE):
+    """Periodic task to clean up expired actions and monitor resources"""
+    try:
+        # Clean up expired actions
+        cleaned_count = await cleanup_expired_actions()
+        
+        # Monitor memory usage
+        await monitor_memory_usage()
+        
+        # Log current pending actions count
+        global pending_actions
+        logger.info(f"📊 Current pending actions: {len(pending_actions)}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error in periodic cleanup: {e}")
 
 def create_smart_keyboard(worker_name: str, current_status: str) -> ReplyKeyboardMarkup:
     """Create smart keyboard based on current attendance status"""
@@ -1359,32 +1414,110 @@ async def periodic_monthly_check(context: ContextTypes.DEFAULT_TYPE):
     pass
 
 async def webhook_handler(request):
-    """Handle incoming webhook requests from Telegram"""
+    """Handle incoming webhook requests from Telegram with improved error handling"""
     try:
-        # Get the update from Telegram
-        update_data = await request.json()
-        update = Update.de_json(update_data, request.app['bot'])
-        
-        # Process the update
-        await request.app['application'].process_update(update)
-        
-        return web.Response(text='OK')
+        # Add timeout protection
+        async with asyncio.timeout(30):  # 30 second timeout
+            
+            # Get the update from Telegram
+            try:
+                update_data = await request.json()
+            except Exception as e:
+                logger.error(f"Failed to parse webhook JSON: {e}")
+                return web.Response(text='Invalid JSON', status=400)
+            
+            # Validate update data
+            if not update_data or 'update_id' not in update_data:
+                logger.error("Invalid update data received")
+                return web.Response(text='Invalid update data', status=400)
+            
+            # Process the update
+            try:
+                update = Update.de_json(update_data, request.app['bot'])
+                await request.app['application'].process_update(update)
+                logger.debug(f"✅ Processed update {update.update_id}")
+            except Exception as e:
+                logger.error(f"Error processing update {update_data.get('update_id', 'unknown')}: {e}")
+                # Don't return error to Telegram to avoid retries
+                return web.Response(text='OK')
+            
+            return web.Response(text='OK')
+            
+    except asyncio.TimeoutError:
+        logger.error("Webhook request timed out after 30 seconds")
+        return web.Response(text='Request timeout', status=408)
     except Exception as e:
-        logger.error(f"Error processing webhook: {e}")
-        return web.Response(text='Error', status=500)
+        logger.error(f"Unexpected error in webhook handler: {e}")
+        return web.Response(text='Internal server error', status=500)
 
 async def health_check(request):
-    """Health check endpoint for Render.com"""
-    return web.Response(text='Bot is running! 🤖')
+    """Health check endpoint for Render.com with system metrics"""
+    try:
+        # Get basic system info
+        memory = psutil.virtual_memory()
+        cpu = psutil.cpu_percent(interval=0.1)
+        disk = psutil.disk_usage('/')
+        
+        # Get pending actions count
+        global pending_actions
+        pending_count = len(pending_actions)
+        
+        # Get uptime
+        uptime = time.time() - psutil.boot_time()
+        
+        health_data = {
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'system': {
+                'memory_percent': memory.percent,
+                'cpu_percent': cpu,
+                'disk_percent': disk.percent,
+                'uptime_seconds': int(uptime)
+            },
+            'bot': {
+                'pending_actions': pending_count,
+                'webhook_active': True
+            }
+        }
+        
+        # Check if system is healthy
+        if memory.percent > 90 or cpu > 90 or disk.percent > 90:
+            health_data['status'] = 'warning'
+        
+        if memory.percent > 95 or cpu > 95 or disk.percent > 95:
+            health_data['status'] = 'critical'
+        
+        return web.json_response(health_data)
+        
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return web.json_response({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }, status=500)
+
+async def shutdown_handler(request, shutdown_event):
+    """Handle graceful shutdown"""
+    try:
+        logger.info("🔄 Shutdown request received")
+        shutdown_event.set()
+        return web.json_response({'status': 'shutdown_initiated'})
+    except Exception as e:
+        logger.error(f"Shutdown handler error: {e}")
+        return web.json_response({'error': str(e)}, status=500)
 
 async def main():
     """Main function"""
+    # Global shutdown flag
+    shutdown_event = asyncio.Event()
+    
     try:
         # Load configuration
         config = load_config()
         token = config['bot_token']
         
-        # Create application with better connection settings
+        # Create application with better connection settings and error handling
         app = Application.builder().token(token).connection_pool_size(1).build()
         
         # Initialize services
@@ -1394,6 +1527,12 @@ async def main():
         # Add services to context
         app.bot_data['sheets_service'] = sheets_service
         app.bot_data['location_service'] = location_service
+        
+        # Add periodic cleanup job (every 15 minutes)
+        job_queue = app.job_queue
+        if job_queue:
+            job_queue.run_repeating(periodic_cleanup, interval=900, first=900)
+            logger.info("✅ Periodic cleanup job scheduled")
         
         # Add conversation handler for registration
         conv_handler = ConversationHandler(
@@ -1437,29 +1576,46 @@ async def main():
         
         logger.info(f"🚀 Attempting to set webhook to: {webhook_url}")
         
-        # Set up webhook
-        try:
-            logger.info(f"🔧 Setting webhook to: {webhook_url}")
-            
-            # Use proper async calls
-            webhook_result = await app.bot.set_webhook(url=webhook_url)
-            
-            if webhook_result:
-                logger.info(f"✅ Webhook set successfully to: {webhook_url}")
+        # Set up webhook with retry logic
+        webhook_success = False
+        max_retries = 3
+        retry_delay = 5
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"🔧 Setting webhook (attempt {attempt + 1}/{max_retries}) to: {webhook_url}")
                 
-                # Verify webhook was actually set
-                webhook_info = await app.bot.get_webhook_info()
-                if webhook_info.url == webhook_url:
-                    logger.info(f"✅ Webhook verified: {webhook_info.url}")
+                # Use proper async calls
+                webhook_result = await app.bot.set_webhook(url=webhook_url)
+                
+                if webhook_result:
+                    logger.info(f"✅ Webhook set successfully to: {webhook_url}")
+                    
+                    # Verify webhook was actually set
+                    webhook_info = await app.bot.get_webhook_info()
+                    if webhook_info.url == webhook_url:
+                        logger.info(f"✅ Webhook verified: {webhook_info.url}")
+                        webhook_success = True
+                        break
+                    else:
+                        logger.error(f"❌ Webhook verification failed. Expected: {webhook_url}, Got: {webhook_info.url}")
+                        raise Exception("Webhook verification failed")
                 else:
-                    logger.error(f"❌ Webhook verification failed. Expected: {webhook_url}, Got: {webhook_info.url}")
-                    raise Exception("Webhook verification failed")
-            else:
-                logger.error(f"❌ Webhook setting failed - API returned False")
-                raise Exception("Webhook API returned False")
-                
-        except Exception as e:
-            logger.error(f"❌ Failed to set webhook: {e}")
+                    logger.error(f"❌ Webhook setting failed - API returned False")
+                    raise Exception("Webhook API returned False")
+                    
+            except Exception as e:
+                logger.error(f"❌ Webhook attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    logger.info(f"🔄 Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    logger.error("❌ All webhook attempts failed")
+                    break
+        
+        if not webhook_success:
+            logger.error("❌ Failed to set webhook after all retries")
             logger.info("🔄 Falling back to polling mode for local development")
             app.run_polling(timeout=30, drop_pending_updates=True)
             return
@@ -1468,11 +1624,13 @@ async def main():
         web_app = web.Application()
         web_app['bot'] = app.bot
         web_app['application'] = app
+        web_app['shutdown_event'] = shutdown_event
         
         # Add routes
         web_app.router.add_post('/webhook', webhook_handler)
         web_app.router.add_get('/health', health_check)
         web_app.router.add_get('/', health_check)
+        web_app.router.add_post('/shutdown', lambda r: shutdown_handler(r, shutdown_event))
         
         # Start the web server
         logger.info(f"🚀 Starting web server on port {port}")
@@ -1488,10 +1646,16 @@ async def main():
             
             logger.info(f"✅ Web server started successfully on port {port}")
             
-            # Keep the server running
-            while True:
-                await asyncio.sleep(1)
+            # Keep the server running with proper shutdown handling
+            while not shutdown_event.is_set():
+                try:
+                    await asyncio.wait_for(shutdown_event.wait(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    # Check for shutdown signal every second
+                    continue
                 
+            logger.info("🔄 Shutdown signal received, cleaning up...")
+            
         except Exception as e:
             logger.error(f"❌ Failed to start web server: {e}")
             # Fallback to polling
@@ -1502,11 +1666,37 @@ async def main():
         logger.error(f"❌ Configuration error: {e}")
     except Exception as e:
         logger.error(f"❌ Unexpected error: {e}")
+    finally:
+        # Cleanup on shutdown
+        try:
+            await cleanup_expired_actions()
+            logger.info("🧹 Final cleanup completed")
+        except Exception as e:
+            logger.error(f"❌ Error during final cleanup: {e}")
 
 if __name__ == "__main__":
     # Create logs directory
     os.makedirs("logs", exist_ok=True)
     
-    # Run the bot with proper async handling
-    import asyncio
-    asyncio.run(main())
+    # Set up signal handling for graceful shutdown
+    def signal_handler(signum, frame):
+        logger.info(f"🔄 Received signal {signum}, initiating graceful shutdown...")
+        # The shutdown will be handled by the shutdown_event in main()
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Run the bot with proper async handling and error recovery
+    try:
+        import asyncio
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("🔄 Keyboard interrupt received, shutting down gracefully...")
+    except Exception as e:
+        logger.error(f"❌ Fatal error in main: {e}")
+        # Attempt to clean up
+        try:
+            cleanup_expired_actions()
+        except:
+            pass
+        raise
