@@ -204,7 +204,7 @@ async def handle_button_callback(update: Update, context):
     # This function is no longer used - all actions are handled by persistent keyboard
     pass
 
-async def handle_checkin(query, worker_name: str):
+async def handle_checkin(query, context, worker_name: str):
     """Handle worker check-in"""
     try:
         # Create location request keyboard with back button
@@ -292,7 +292,7 @@ async def handle_checkout(query, worker_name: str):
         logger.error(f"Error during check-out: {e}")
         await query.edit_message_text("❌ Σφάλμα κατά το check-out. Παρακαλώ δοκιμάστε ξανά.")
 
-async def handle_schedule_request(query, worker_name: str):
+async def handle_schedule_request(query, context, worker_name: str):
     """Handle weekly schedule request"""
     try:
         from datetime import datetime, timedelta
@@ -307,7 +307,12 @@ async def handle_schedule_request(query, worker_name: str):
         
         # Get worker's telegram ID to find their schedule
         user = query.from_user
-        existing_worker = await sheets_service.find_worker_by_telegram_id(user.id)
+        
+        # Get sheets_service from the bot context
+        sheets_service = context.bot_data.get('sheets_service')
+        if not sheets_service:
+            await query.edit_message_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
+            return
         
         if not existing_worker:
             await query.edit_message_text("❌ Δεν είστε εγγεγραμμένος στο σύστημα.")
@@ -906,6 +911,13 @@ async def handle_persistent_schedule(update: Update, context, worker_name: str):
         
         # Get worker's telegram ID to find their schedule
         user = update.effective_user
+        
+        # Get sheets_service from the bot context
+        sheets_service = context.bot_data.get('sheets_service')
+        if not sheets_service:
+            await update.message.reply_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
+            return
+            
         existing_worker = await sheets_service.find_worker_by_telegram_id(user.id)
         
         if not existing_worker:
