@@ -18,7 +18,7 @@ class LocationService:
         # Office coordinates from environment variables
         self.office_latitude = float(os.getenv('OFFICE_LATITUDE', '37.909411'))
         self.office_longitude = float(os.getenv('OFFICE_LONGITUDE', '23.871109'))
-        self.office_radius_meters = int(os.getenv('OFFICE_RADIUS_METERS', '500'))
+        self.office_radius_meters = int(os.getenv('OFFICE_RADIUS_METERS', '300'))
         
         logger.info(f"📍 Office zone set: {self.office_latitude}, {self.office_longitude} (radius: {self.office_radius_meters}m)")
     
