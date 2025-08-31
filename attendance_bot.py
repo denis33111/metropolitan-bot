@@ -1383,8 +1383,6 @@ async def main():
             fallbacks=[CommandHandler("cancel", cancel_registration)]
         )
         
-        app.add_handler(conv_handler)
-        
         # Add admin command to list workers
         app.add_handler(CommandHandler("workers", list_workers_command))
 
@@ -1397,7 +1395,10 @@ async def main():
         # Add message handler for location messages
         app.add_handler(MessageHandler(filters.LOCATION, handle_location_message))
         
-        # Add message handler for persistent keyboard buttons
+        # Add conversation handler for registration flow (MUST come before generic text handler)
+        app.add_handler(conv_handler)
+        
+        # Add message handler for persistent keyboard buttons (GENERIC - comes LAST)
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_persistent_keyboard))
         
         # Initialize the application properly
