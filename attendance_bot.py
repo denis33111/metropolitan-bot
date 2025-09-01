@@ -1851,27 +1851,54 @@ async def attendance_command(update: Update, context):
                 
                 logger.info(f"🔍 DEBUG STEP 9: Final attendance report: {attendance_report}")
                 
-                # Generate the report
+                # Generate the new redesigned report
                 report = f"📊 **TODAY'S ATTENDANCE** ({today.strftime('%d/%m/%Y')})\n\n"
                 
-                if attendance_report['checked_in']:
-                    report += "✅ **CHECKED IN:**\n"
-                    for employee in attendance_report['checked_in']:
-                        status_emoji = "🟢" if employee['status'] == "On time" else "🟡"
-                        report += f"• {employee['name']} - {employee['time']} ({employee['status']})\n"
+                # Separate employees by status
+                on_time_employees = []
+                late_employees = []
+                not_checked_in_employees = []
+                
+                # Categorize checked-in employees
+                for employee in attendance_report['checked_in']:
+                    if employee['status'] == "On time":
+                        on_time_employees.append(employee)
+                    elif employee['status'] == "Late":
+                        late_employees.append(employee)
+                    else:
+                        # Unknown status - treat as late for safety
+                        late_employees.append(employee)
+                
+                # Add not checked in employees
+                not_checked_in_employees = attendance_report['not_checked_in']
+                
+                # 1. GREEN: Checked in (On time)
+                if on_time_employees:
+                    report += "🟢 **CHECKED IN (ON TIME):**\n"
+                    for employee in on_time_employees:
+                        report += f"• {employee['name']} - {employee['time']}\n"
                     report += "\n"
                 
-                if attendance_report['not_checked_in']:
-                    report += "❌ **NOT CHECKED IN:**\n"
-                    for employee in attendance_report['not_checked_in']:
-                        report += f"• {employee['name']} (Scheduled: {employee['schedule']})\n"
+                # 2. YELLOW: Checked in (Late)
+                if late_employees:
+                    report += "🟡 **CHECKED IN (LATE):**\n"
+                    for employee in late_employees:
+                        report += f"• {employee['name']} - {employee['time']}\n"
+                    report += "\n"
+                
+                # 3. RED: Didn't check in
+                if not_checked_in_employees:
+                    report += "🔴 **DIDN'T CHECK IN:**\n"
+                    for employee in not_checked_in_employees:
+                        report += f"• {employee['name']}\n"
+                    report += "\n"
                 
                 # Add summary
                 total_scheduled = len(today_schedules)
                 total_checked_in = len(attendance_report['checked_in'])
                 total_missing = len(attendance_report['not_checked_in'])
                 
-                report += f"\n📈 **SUMMARY:**\n"
+                report += f"📈 **SUMMARY:**\n"
                 report += f"• Total Scheduled: {total_scheduled}\n"
                 report += f"• Checked In: {total_checked_in}\n"
                 report += f"• Missing: {total_missing}"
