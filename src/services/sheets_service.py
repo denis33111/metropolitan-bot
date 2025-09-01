@@ -42,7 +42,7 @@ class GoogleSheetsService:
                     scopes = ['https://www.googleapis.com/auth/spreadsheets']
                     credentials = Credentials.from_service_account_info(creds_data, scopes=scopes)
                     self.service = build('sheets', 'v4', credentials=credentials)
-                    logger.info("✅ Google Sheets API connected with environment credentials")
+                    logger.info("✅ Google Sheets API ready")
                     return
                 except Exception as e:
                     logger.warning(f"⚠️ Failed to decode environment credentials: {e}")
@@ -55,7 +55,7 @@ class GoogleSheetsService:
                 scopes = ['https://www.googleapis.com/auth/spreadsheets']
                 credentials = Credentials.from_service_account_file(creds_file, scopes=scopes)
                 self.service = build('sheets', 'v4', credentials=credentials)
-                logger.info("✅ Google Sheets API connected with service account file")
+                                    logger.info("✅ Google Sheets API ready")
             else:
                 # No credentials found
                 logger.warning("⚠️ No credentials found - using temporary storage")

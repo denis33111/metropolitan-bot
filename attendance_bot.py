@@ -1440,13 +1440,15 @@ async def main():
         # Create application with better connection settings and error handling
         app = Application.builder().token(token).connection_pool_size(1).build()
         
-        # Initialize services
+        # Initialize services (lazy loading - no startup API calls)
         sheets_service = GoogleSheetsService(config['spreadsheet_id'])
         location_service = LocationService()
         
         # Add services to context
         app.bot_data['sheets_service'] = sheets_service
         app.bot_data['location_service'] = location_service
+        
+        logger.info("✅ Services initialized (lazy loading enabled)")
         
         # Add periodic cleanup job (every 15 minutes)
         job_queue = app.job_queue
@@ -1486,7 +1488,7 @@ async def main():
         # Initialize the application properly
         await app.initialize()
         
-        logger.info("🤖 Starting Working Metropolitan Bot with Google Sheets and Attendance Buttons...")
+        logger.info("🤖 Starting Working Metropolitan Bot...")
         
         # Get port from environment (Render.com sets this)
         port = int(os.getenv('PORT', 8080))
@@ -1495,34 +1497,32 @@ async def main():
         render_app_name = os.getenv('RENDER_APP_NAME', 'metropolitan-bot')
         webhook_url = f"https://{render_app_name}.onrender.com/webhook"
         
-        logger.info(f"🚀 Attempting to set webhook to: {webhook_url}")
+        logger.info(f"🚀 Setting up webhook...")
         
-        # Set up webhook with retry logic
+        # Set up webhook with optimized retry logic
         webhook_success = False
-        max_retries = 3
-        retry_delay = 5
+        max_retries = 2  # Reduced from 3
+        retry_delay = 2  # Reduced from 5
         
         for attempt in range(max_retries):
             try:
-                logger.info(f"🔧 Setting webhook (attempt {attempt + 1}/{max_retries}) to: {webhook_url}")
+                logger.info(f"🔧 Webhook setup (attempt {attempt + 1}/{max_retries})")
                 
                 # Use proper async calls
                 webhook_result = await app.bot.set_webhook(url=webhook_url)
                 
                 if webhook_result:
-                    logger.info(f"✅ Webhook set successfully to: {webhook_url}")
+                    logger.info(f"✅ Webhook set successfully")
                     
-                    # Verify webhook was actually set
+                    # Quick verification
                     webhook_info = await app.bot.get_webhook_info()
                     if webhook_info.url == webhook_url:
-                        logger.info(f"✅ Webhook verified: {webhook_info.url}")
+                        logger.info(f"✅ Webhook verified")
                         webhook_success = True
                         break
                     else:
-                        logger.error(f"❌ Webhook verification failed. Expected: {webhook_url}, Got: {webhook_info.url}")
                         raise Exception("Webhook verification failed")
                 else:
-                    logger.error(f"❌ Webhook setting failed - API returned False")
                     raise Exception("Webhook API returned False")
                     
             except Exception as e:
@@ -1554,9 +1554,7 @@ async def main():
         web_app.router.add_post('/shutdown', lambda r: shutdown_handler(r, shutdown_event))
         
         # Start the web server
-        logger.info(f"🚀 Starting web server on port {port}")
-        logger.info(f"🌐 Webhook endpoint: {webhook_url}")
-        logger.info(f"🏥 Health check: http://0.0.0.0:{port}/health")
+        logger.info(f"🚀 Starting web server...")
         
         try:
             # Use runner to avoid event loop conflicts
@@ -1565,7 +1563,7 @@ async def main():
             site = web.TCPSite(runner, '0.0.0.0', port)
             await site.start()
             
-            logger.info(f"✅ Web server started successfully on port {port}")
+            logger.info(f"✅ Bot ready! Webhook: {webhook_url}")
             
             # Keep the server running with proper shutdown handling
             while not shutdown_event.is_set():
