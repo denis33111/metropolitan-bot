@@ -55,7 +55,7 @@ class GoogleSheetsService:
                 scopes = ['https://www.googleapis.com/auth/spreadsheets']
                 credentials = Credentials.from_service_account_file(creds_file, scopes=scopes)
                 self.service = build('sheets', 'v4', credentials=credentials)
-                                    logger.info("✅ Google Sheets API ready")
+                logger.info("✅ Google Sheets API ready")
             else:
                 # No credentials found
                 logger.warning("⚠️ No credentials found - using temporary storage")
