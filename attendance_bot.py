@@ -1756,9 +1756,16 @@ async def attendance_command(update: Update, context):
                             logger.info(f"🔍 DEBUG STEP 9: Looking in column {today_monthly_col}, row length: {len(row)}")
                             
                             if today_monthly_col < len(row) and row[today_monthly_col]:
-                                check_in_time = row[today_monthly_col]
+                                full_check_in_data = row[today_monthly_col]
                                 schedule_time = today_schedules[employee_name]
-                                logger.info(f"🔍 DEBUG STEP 9: {employee_name} CHECKED IN at {check_in_time}")
+                                
+                                # Extract check-in time from full schedule format (e.g., "09:00-17:00" -> "09:00")
+                                if '-' in str(full_check_in_data):
+                                    check_in_time = str(full_check_in_data).split('-')[0]
+                                    logger.info(f"🔍 DEBUG STEP 9: {employee_name} CHECKED IN at {check_in_time} (extracted from {full_check_in_data})")
+                                else:
+                                    check_in_time = str(full_check_in_data)
+                                    logger.info(f"🔍 DEBUG STEP 9: {employee_name} CHECKED IN at {check_in_time}")
                                 
                                 # Determine if late or on time
                                 try:
