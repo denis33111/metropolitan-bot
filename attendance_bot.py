@@ -729,6 +729,10 @@ async def handle_persistent_keyboard(update: Update, context):
         user = update.effective_user
         text = update.message.text
         
+        logger.info(f"🔍 DEBUG: handle_persistent_keyboard called by user {user.id}")
+        logger.info(f"🔍 DEBUG: Button text: '{text}'")
+        logger.info(f"🔍 DEBUG: User info: {user.username} ({user.first_name} {user.last_name})")
+        
         # Check if worker exists
         sheets_service = context.bot_data.get('sheets_service')
         location_service = context.bot_data.get('location_service')
@@ -742,10 +746,12 @@ async def handle_persistent_keyboard(update: Update, context):
         
         if text == "✅ Check In":
             # Handle check-in via persistent keyboard
+            logger.info(f"🔍 DEBUG: Check In button pressed by user {user.id} ({worker_name})")
             await handle_persistent_checkin(update, context, worker_name)
             
         elif text == "🚪 Check Out":
             # Handle check-out via persistent keyboard
+            logger.info(f"🔍 DEBUG: Check Out button pressed by user {user.id} ({worker_name})")
             await handle_persistent_checkout(update, context, worker_name)
             
         elif text == "📅 Πρόγραμμα":
