@@ -650,10 +650,8 @@ async def complete_checkin(update: Update, context, pending_data: dict, location
             message = f"""
 ✅ **Check-in επιτυχής!**
 
-**Όνομα:** {worker_name}
 **Ώρα:** {current_time}
 **Ημερομηνία:** {current_date}
-**📍 Τοποθεσία:** Επαληθεύθηκε ({location_result['distance_meters']}m από γραφείο)
 
 **Τώρα μπορείτε να κάνετε check-out όταν τελειώσετε τη βάρδια!**
             """
@@ -710,11 +708,9 @@ async def complete_checkout(update: Update, context, pending_data: dict, locatio
                 message = f"""
 🚪 **Check-out επιτυχής!**
 
-**Όνομα:** {worker_name}
 **Check-in:** {check_in_time}
 **Check-out:** {current_time}
 **Ημερομηνία:** {current_date}
-**📍 Τοποθεσία:** Επαληθεύθηκε ({location_result['distance_meters']}m από γραφείο)
 
 **Η βάρδια σας ολοκληρώθηκε! Μπορείτε να κάνετε check-in αύριο.**
                 """
