@@ -254,98 +254,11 @@ async def cancel_registration(update: Update, context):
     context.user_data.pop('registration', None)
     return ConversationHandler.END
 
-async def handle_button_callback(update: Update, context):
-    """Handle button callbacks - NOT USED ANYMORE (persistent keyboard only)"""
-    # This function is no longer used - all actions are handled by persistent keyboard
-    pass
-
-async def handle_checkin(query, context, worker_name: str):
-    """Handle worker check-in"""
-    try:
-        # Create location request keyboard with back button
-        location_keyboard = ReplyKeyboardMarkup([
-            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
-            [KeyboardButton("🏠 Πίσω στο μενού")]
-        ], resize_keyboard=True, one_time_keyboard=True)
-        
-        # Ask for location with automated button
-        location_message = f"""
-📍 **Check-in για {worker_name}**
-
-**Για να κάνετε check-in, πατήστε το κουμπί παρακάτω:**
-
-**📍 Στείλε την τοποθεσία μου**
-
-**⚠️ Προσοχή:** Πρέπει να είστε μέσα σε 300m από το γραφείο!
-
-**🏠 Ή πατήστε "Πίσω στο μενού" για να ακυρώσετε**
-        """
-        
-        # Store check-in request in global pending_actions
-        user_id = query.from_user.id
-        pending_actions[user_id] = {
-            'worker_name': worker_name,
-            'action': 'checkin',
-            'timestamp': datetime.now()
-        }
-        
-        # Show location request message with automated button
-        await query.edit_message_text(location_message, parse_mode='Markdown')
-        
-        # Send the location request keyboard
-        await query.message.reply_text(
-            "**Πατήστε το κουμπί για να στείλετε την τοποθεσία σας:**",
-            reply_markup=location_keyboard,
-            parse_mode='Markdown'
-        )
-        
-    except Exception as e:
-        logger.error(f"Error during check-in: {e}")
-        await query.edit_message_text("❌ Σφάλμα κατά το check-in. Παρακαλώ δοκιμάστε ξανά.")
-
-async def handle_checkout(query, worker_name: str):
-    """Handle worker check-out"""
-    try:
-        # Create location request keyboard with back button
-        location_keyboard = ReplyKeyboardMarkup([
-            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
-            [KeyboardButton("🏠 Πίσω στο μενού")]
-        ], resize_keyboard=True, one_time_keyboard=True)
-        
-        # Ask for location with automated button
-        location_message = f"""
-🚪 **Check-out για {worker_name}**
-
-**Για να κάνετε check-out, πατήστε το κουμπί παρακάτω:**
-
-**📍 Στείλε την τοποθεσία μου**
-
-**⚠️ Προσοχή:** Πρέπει να είστε μέσα σε 300m από το γραφείο!
-
-**🏠 Ή πατήστε "Πίσω στο μενού" για να ακυρώσετε**
-        """
-        
-        # Store check-out request in global pending_actions
-        user_id = query.from_user.id
-        pending_actions[user_id] = {
-            'worker_name': worker_name,
-            'action': 'checkout',
-            'timestamp': datetime.now()
-        }
-        
-        # Show location request message with automated button
-        await query.edit_message_text(location_message, parse_mode='Markdown')
-        
-        # Send the location request keyboard
-        await query.message.reply_text(
-            "**Πατήστε το κουμπί για να στείλετε την τοποθεσία σας:**",
-            reply_markup=location_keyboard,
-            parse_mode='Markdown'
-        )
-        
-    except Exception as e:
-        logger.error(f"Error during check-out: {e}")
-        await query.edit_message_text("❌ Σφάλμα κατά το check-out. Παρακαλώ δοκιμάστε ξανά.")
+# LEGACY FUNCTIONS - REMOVED (were causing duplicate messages)
+# These functions are no longer used - all check-in/check-out flows now use persistent keyboard
+# async def handle_button_callback() - REMOVED
+# async def handle_checkin() - REMOVED  
+# async def handle_checkout() - REMOVED
 
 async def handle_schedule_request(query, context, worker_name: str):
     """Handle weekly schedule request"""
@@ -816,19 +729,17 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
         if user_id in pending_actions:
             existing_action = pending_actions[user_id]
             if existing_action['action'] == 'checkin':
+                # Already in check-in flow - just remind them to send location
                 await update.message.reply_text(
                     f"⏳ **Check-in σε εξέλιξη για {worker_name}**\n\n"
-                    "**🔄 Δεν χρειάζεται να πατήσετε ξανά το κουμπί Check In!**\n\n"
-                    "**📱 Απλά στείλτε την τοποθεσία σας** με το κουμπί που ήδη εμφανίστηκε.\n\n"
-                    "**⏰ Περιμένετε την επεξεργασία...**",
+                    "**📱 Στείλτε την τοποθεσία σας** με το κουμπί που εμφανίστηκε.",
                     parse_mode='Markdown'
                 )
                 return
             elif existing_action['action'] == 'checkout':
                 await update.message.reply_text(
                     f"⚠️ **Έχετε ήδη ένα check-out σε εξέλιξη**\n\n"
-                    "**🔄 Περιμένετε να ολοκληρωθεί το check-out πριν κάνετε check-in.**\n\n"
-                    "**📱 Χρησιμοποιήστε το κουμπί που ήδη εμφανίστηκε.**",
+                    "**🔄 Περιμένετε να ολοκληρωθεί το check-out πριν κάνετε check-in.**",
                     parse_mode='Markdown'
                 )
                 return
@@ -867,19 +778,17 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
         if user_id in pending_actions:
             existing_action = pending_actions[user_id]
             if existing_action['action'] == 'checkout':
+                # Already in check-out flow - just remind them to send location
                 await update.message.reply_text(
                     f"⏳ **Check-out σε εξέλιξη για {worker_name}**\n\n"
-                    "**🔄 Δεν χρειάζεται να πατήσετε ξανά το κουμπί Check Out!**\n\n"
-                    "**📱 Απλά στείλτε την τοποθεσία σας** με το κουμπί που ήδη εμφανίστηκε.\n\n"
-                    "**⏰ Περιμένετε την επεξεργασία...**",
+                    "**📱 Στείλτε την τοποθεσία σας** με το κουμπί που εμφανίστηκε.",
                     parse_mode='Markdown'
                 )
                 return
             elif existing_action['action'] == 'checkin':
                 await update.message.reply_text(
                     f"⚠️ **Έχετε ήδη ένα check-in σε εξέλιξη**\n\n"
-                    "**🔄 Περιμένετε να ολοκληρωθεί το check-in πριν κάνετε check-out.**\n\n"
-                    "**📱 Χρησιμοποιήστε το κουμπί που ήδη εμφανίστηκε.**",
+                    "**🔄 Περιμένετε να ολοκληρωθεί το check-in πριν κάνετε check-out.**",
                     parse_mode='Markdown'
                 )
                 return
