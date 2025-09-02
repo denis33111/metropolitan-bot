@@ -511,8 +511,13 @@ async def handle_location_message(update: Update, context):
         # Check if user has a pending action
         pending_action = pending_actions.get(user_id)
         
+        logger.info(f"🔍 DEBUG: Checking pending actions for user {user_id}")
+        logger.info(f"🔍 DEBUG: Current pending actions: {pending_actions}")
+        logger.info(f"🔍 DEBUG: User's pending action: {pending_action}")
+        
         if not pending_action:
             # No pending action, ignore location
+            logger.info(f"🔍 DEBUG: No pending action for user {user_id}, ignoring location")
             return
         
         # Get location from message
@@ -528,18 +533,27 @@ async def handle_location_message(update: Update, context):
         latitude = location.latitude
         longitude = location.longitude
         
+        logger.info(f"🔍 DEBUG: Received location from user {user_id}:")
+        logger.info(f"🔍 DEBUG:   Raw location object: {location}")
+        logger.info(f"🔍 DEBUG:   Latitude: {latitude}")
+        logger.info(f"🔍 DEBUG:   Longitude: {longitude}")
+        logger.info(f"🔍 DEBUG:   Location type: {type(latitude)}, {type(longitude)}")
+        
         # Get services from context
         location_service = context.bot_data.get('location_service')
         if not location_service:
+            logger.error("🔍 DEBUG: Location service not available in context")
             logger.error("Location service not available in context")
             await update.message.reply_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία τοποθεσίας.")
             # Clear pending action when service unavailable so user can try again
             pending_actions.pop(user_id, None)
             await return_to_main_menu(update, context, user_id)
             return
-            
+        
+        logger.info(f"🔍 DEBUG: Location service found, calling is_within_office_zone...")
         # Verify location is within office zone
         location_result = location_service.is_within_office_zone(latitude, longitude)
+        logger.info(f"🔍 DEBUG: Location verification result: {location_result}")
         
         if not location_result['is_within']:
             # Location outside zone - show error and return to main menu
@@ -554,13 +568,18 @@ async def handle_location_message(update: Update, context):
             return
         
         # Location verified, proceed with action
+        logger.info(f"🔍 DEBUG: Location verified, proceeding with action: {pending_action['action']}")
         if pending_action['action'] == 'checkin':
+            logger.info(f"🔍 DEBUG: Calling complete_checkin for user {user_id}")
             await complete_checkin(update, context, pending_action, location_result)
         elif pending_action['action'] == 'checkout':
+            logger.info(f"🔍 DEBUG: Calling complete_checkout for user {user_id}")
             await complete_checkout(update, context, pending_action, location_result)
         
         # Clear pending action
+        logger.info(f"🔍 DEBUG: Clearing pending action for user {user_id}")
         pending_actions.pop(user_id, None)
+        logger.info(f"🔍 DEBUG: Pending actions after clearing: {pending_actions}")
         
     except Exception as e:
         logger.error(f"Error handling location message: {e}")
@@ -780,6 +799,8 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
             'action': 'checkin',
             'timestamp': datetime.now()
         }
+        logger.info(f"🔍 DEBUG: Stored check-in pending action for user {user_id}: {pending_actions[user_id]}")
+        logger.info(f"🔍 DEBUG: All pending actions: {pending_actions}")
         
         # Show minimal location request message
         await update.message.reply_text(
@@ -829,6 +850,8 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
             'action': 'checkout',
             'timestamp': datetime.now()
         }
+        logger.info(f"🔍 DEBUG: Stored check-out pending action for user {user_id}: {pending_actions[user_id]}")
+        logger.info(f"🔍 DEBUG: All pending actions: {pending_actions}")
         
         # Show minimal location request message
         await update.message.reply_text(
