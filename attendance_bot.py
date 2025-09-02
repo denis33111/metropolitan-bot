@@ -52,7 +52,9 @@ pending_actions = {}
 async def cleanup_expired_actions():
     """Clean up expired pending actions to prevent memory leaks"""
     global pending_actions
-    current_time = datetime.now()
+    import pytz
+    greece_tz = pytz.timezone('Europe/Athens')
+    current_time = datetime.now(greece_tz)
     expired_keys = []
     
     for user_id, action_data in pending_actions.items():
@@ -625,7 +627,11 @@ async def complete_checkin(update: Update, context, pending_data: dict, location
         sheets_service = context.bot_data.get('sheets_service')
         location_service = context.bot_data.get('location_service')
         worker_name = pending_data['worker_name']
-        current_time = datetime.now().strftime("%H:%M")
+        
+        # Use Greece timezone for check-in time
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
+        current_time = datetime.now(greece_tz).strftime("%H:%M")
         
         # Update attendance sheet
         success = await sheets_service.update_attendance_cell(
@@ -638,12 +644,15 @@ async def complete_checkin(update: Update, context, pending_data: dict, location
             # Create smart keyboard for check-in status
             smart_keyboard = create_smart_keyboard(worker_name, 'CHECKED_IN')
             
+            # Get current date in Greece timezone for display
+            current_date = datetime.now(greece_tz).strftime("%d/%m/%Y")
+            
             message = f"""
 ✅ **Check-in επιτυχής!**
 
 **Όνομα:** {worker_name}
 **Ώρα:** {current_time}
-**Ημερομηνία:** {datetime.now().strftime("%d/%m/%Y")}
+**Ημερομηνία:** {current_date}
 **📍 Τοποθεσία:** Επαληθεύθηκε ({location_result['distance_meters']}m από γραφείο)
 
 **Τώρα μπορείτε να κάνετε check-out όταν τελειώσετε τη βάρδια!**
@@ -670,7 +679,11 @@ async def complete_checkout(update: Update, context, pending_data: dict, locatio
         sheets_service = context.bot_data.get('sheets_service')
         location_service = context.bot_data.get('location_service')
         worker_name = pending_data['worker_name']
-        current_time = datetime.now().strftime("%H:%M")
+        
+        # Use Greece timezone for check-out time
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
+        current_time = datetime.now(greece_tz).strftime("%H:%M")
         
         # Get current attendance status to find check-in time
         attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
@@ -691,13 +704,16 @@ async def complete_checkout(update: Update, context, pending_data: dict, locatio
                 # Create smart keyboard for completed status
                 smart_keyboard = create_smart_keyboard(worker_name, 'COMPLETE')
                 
+                # Get current date in Greece timezone for display
+                current_date = datetime.now(greece_tz).strftime("%d/%m/%Y")
+                
                 message = f"""
 🚪 **Check-out επιτυχής!**
 
 **Όνομα:** {worker_name}
 **Check-in:** {check_in_time}
 **Check-out:** {current_time}
-**Ημερομηνία:** {datetime.now().strftime("%d/%m/%Y")}
+**Ημερομηνία:** {current_date}
 **📍 Τοποθεσία:** Επαληθεύθηκε ({location_result['distance_meters']}m από γραφείο)
 
 **Η βάρδια σας ολοκληρώθηκε! Μπορείτε να κάνετε check-in αύριο.**
@@ -800,10 +816,12 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
         ], resize_keyboard=True, one_time_keyboard=True)
         
         # Store check-in request in global pending_actions
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
         pending_actions[user_id] = {
             'worker_name': worker_name,
             'action': 'checkin',
-            'timestamp': datetime.now()
+            'timestamp': datetime.now(greece_tz)
         }
         logger.info(f"🔍 DEBUG: Stored check-in pending action for user {user_id}: {pending_actions[user_id]}")
         logger.info(f"🔍 DEBUG: All pending actions: {pending_actions}")
@@ -851,10 +869,12 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
         ], resize_keyboard=True, one_time_keyboard=True)
         
         # Store check-out request in global pending_actions
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
         pending_actions[user_id] = {
             'worker_name': worker_name,
             'action': 'checkout',
-            'timestamp': datetime.now()
+            'timestamp': datetime.now(greece_tz)
         }
         logger.info(f"🔍 DEBUG: Stored check-out pending action for user {user_id}: {pending_actions[user_id]}")
         logger.info(f"🔍 DEBUG: All pending actions: {pending_actions}")
@@ -1106,7 +1126,10 @@ async def create_next_two_months_sheets(update: Update, context: ContextTypes.DE
         user = update.effective_user
         logger.info(f"👤 User {user.username} ({user.id}) requested month creation")
         
-        current_time = datetime.now()
+        # Use Greece timezone for month creation
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
+        current_time = datetime.now(greece_tz)
         
         # Get current month and next 2 months
         current_month_name = f"{current_time.month:02d}_{current_time.year}"
@@ -1347,9 +1370,13 @@ async def health_check(request):
         # Get uptime
         uptime = time.time() - psutil.boot_time()
         
+        # Use Greece timezone for health check timestamp
+        import pytz
+        greece_tz = pytz.timezone('Europe/Athens')
+        
         health_data = {
             'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': datetime.now(greece_tz).isoformat(),
             'system': {
                 'memory_percent': memory.percent,
                 'cpu_percent': cpu,
@@ -1376,7 +1403,7 @@ async def health_check(request):
         return web.json_response({
             'status': 'error',
             'error': str(e),
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now(greece_tz).isoformat()
         }, status=500)
 
 async def shutdown_handler(request, shutdown_event):
