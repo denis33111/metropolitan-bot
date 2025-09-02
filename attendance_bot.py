@@ -518,6 +518,8 @@ async def handle_location_message(update: Update, context):
         # Get location from message
         if not update.message.location:
             await update.message.reply_text("❌ Παρακαλώ στείλτε την τοποθεσία σας (location), όχι κείμενο.")
+            # Clear pending action for invalid location so user can try again
+            pending_actions.pop(user_id, None)
             # Return to main menu even for invalid location
             await return_to_main_menu(update, context, user_id)
             return
@@ -531,6 +533,8 @@ async def handle_location_message(update: Update, context):
         if not location_service:
             logger.error("Location service not available in context")
             await update.message.reply_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία τοποθεσίας.")
+            # Clear pending action when service unavailable so user can try again
+            pending_actions.pop(user_id, None)
             await return_to_main_menu(update, context, user_id)
             return
             
@@ -542,7 +546,10 @@ async def handle_location_message(update: Update, context):
             location_msg = location_service.format_location_message(location_result)
             await update.message.reply_text(location_msg, parse_mode='Markdown')
             
-            # IMPORTANT: Return to main menu after failed location check
+            # IMPORTANT: Clear pending action when location fails so user can try again
+            pending_actions.pop(user_id, None)
+            
+            # Return to main menu after failed location check
             await return_to_main_menu(update, context, user_id)
             return
         
@@ -558,6 +565,8 @@ async def handle_location_message(update: Update, context):
     except Exception as e:
         logger.error(f"Error handling location message: {e}")
         await update.message.reply_text("❌ Σφάλμα κατά την επεξεργασία της τοποθεσίας.")
+        # Clear pending action on error so user can try again
+        pending_actions.pop(user_id, None)
         # Return to main menu even on error
         await return_to_main_menu(update, context, user_id)
 
