@@ -21,9 +21,13 @@ class LocationService:
         self.office_radius_meters = int(os.getenv('OFFICE_RADIUS_METERS', '300'))
         
         logger.info(f"🔍 DEBUG: LocationService initialized")
-        logger.info(f"🔍 DEBUG: OFFICE_LATITUDE env var: {os.getenv('OFFICE_LATITUDE', 'NOT_SET')}")
-        logger.info(f"🔍 DEBUG: OFFICE_LONGITUDE env var: {os.getenv('OFFICE_LONGITUDE', 'NOT_SET')}")
-        logger.info(f"🔍 DEBUG: OFFICE_RADIUS_METERS env var: {os.getenv('OFFICE_RADIUS_METERS', 'NOT_SET')}")
+        logger.info(f"🔍 DEBUG: OFFICE_LATITUDE env var: '{os.getenv('OFFICE_LATITUDE', 'NOT_SET')}'")
+        logger.info(f"🔍 DEBUG: OFFICE_LONGITUDE env var: '{os.getenv('OFFICE_LONGITUDE', 'NOT_SET')}'")
+        logger.info(f"🔍 DEBUG: OFFICE_RADIUS_METERS env var: '{os.getenv('OFFICE_RADIUS_METERS', 'NOT_SET')}'")
+        logger.info(f"🔍 DEBUG: All environment variables starting with OFFICE_:")
+        for key, value in os.environ.items():
+            if key.startswith('OFFICE_'):
+                logger.info(f"🔍 DEBUG:   {key} = '{value}'")
         logger.info(f"📍 Office zone set: {self.office_latitude}, {self.office_longitude} (radius: {self.office_radius_meters}m)")
     
     def calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
