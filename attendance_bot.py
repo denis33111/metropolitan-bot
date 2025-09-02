@@ -634,10 +634,16 @@ async def complete_checkin(update: Update, context, pending_data: dict, location
             await update.message.reply_text(message, parse_mode='Markdown', reply_markup=smart_keyboard)
         else:
             await update.message.reply_text("❌ Σφάλμα κατά το check-in. Παρακαλώ δοκιμάστε ξανά.")
+            # Clear pending action on failure so user can try again
+            user_id = update.effective_user.id
+            pending_actions.pop(user_id, None)
             
     except Exception as e:
         logger.error(f"Error completing check-in: {e}")
         await update.message.reply_text("❌ Σφάλμα κατά το check-in. Παρακαλώ δοκιμάστε ξανά.")
+        # Clear pending action on error so user can try again
+        user_id = update.effective_user.id
+        pending_actions.pop(user_id, None)
 
 async def complete_checkout(update: Update, context, pending_data: dict, location_result: dict):
     """Complete check-out after location verification"""
@@ -682,12 +688,21 @@ async def complete_checkout(update: Update, context, pending_data: dict, locatio
                 await update.message.reply_text(message, parse_mode='Markdown', reply_markup=smart_keyboard)
             else:
                 await update.message.reply_text("❌ Σφάλμα κατά το check-out. Παρακαλώ δοκιμάστε ξανά.")
+                # Clear pending action on failure so user can try again
+                user_id = update.effective_user.id
+                pending_actions.pop(user_id, None)
         else:
             await update.message.reply_text("❌ Δεν μπορείτε να κάνετε check-out χωρίς να έχετε κάνει check-in.")
+            # Clear pending action when not checked in so user can try again
+            user_id = update.effective_user.id
+            pending_actions.pop(user_id, None)
             
     except Exception as e:
         logger.error(f"Error completing check-out: {e}")
         await update.message.reply_text("❌ Σφάλμα κατά το check-out. Παρακαλώ δοκιμάστε ξανά.")
+        # Clear pending action on error so user can try again
+        user_id = update.effective_user.id
+        pending_actions.pop(user_id, None)
 
 async def handle_persistent_keyboard(update: Update, context):
     """Handle persistent keyboard button presses"""
