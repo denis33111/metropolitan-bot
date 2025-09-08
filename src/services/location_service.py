@@ -16,8 +16,8 @@ class LocationService:
     
     def __init__(self):
         # Office coordinates from environment variables
-        self.office_latitude = float(os.getenv('OFFICE_LATITUDE', '37.909411'))
-        self.office_longitude = float(os.getenv('OFFICE_LONGITUDE', '23.871109'))
+        self.office_latitude = float(os.getenv('OFFICE_LATITUDE', '37.956813'))
+        self.office_longitude = float(os.getenv('OFFICE_LONGITUDE', '23.957022'))
         self.office_radius_meters = int(os.getenv('OFFICE_RADIUS_METERS', '300'))
         
         logger.info(f"🔍 DEBUG: LocationService initialized")
