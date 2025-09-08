@@ -785,15 +785,64 @@ async def handle_persistent_keyboard(update: Update, context):
 async def handle_persistent_checkin(update: Update, context, worker_name: str):
     """Handle check-in from persistent keyboard"""
     try:
-        # Check if user already has a pending action
+        # Get sheets service
+        sheets_service = context.bot_data.get('sheets_service')
+        if not sheets_service:
+            await update.message.reply_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
+            return
+        
+        # Check current attendance status from Google Sheets (not memory)
+        attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
+        current_status = attendance_status['status']
+        
+        # If already checked in today, show current status
+        if current_status == 'CHECKED_IN':
+            check_in_time = attendance_status['time']
+            await update.message.reply_text(
+                f"✅ **Έχετε ήδη κάνει check-in σήμερα!**\n\n"
+                f"**Ώρα check-in:** {check_in_time}\n\n"
+                f"**Επόμενη ενέργεια:** Πατήστε 🚪 Check Out όταν τελειώσετε τη βάρδια.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # If already completed today, show completion status
+        elif current_status == 'COMPLETE':
+            check_in_time = attendance_status['time']
+            if '-' in check_in_time:
+                check_in, check_out = check_in_time.split('-')
+                await update.message.reply_text(
+                    f"🎉 **Η βάρδια σας ολοκληρώθηκε!**\n\n"
+                    f"**Check-in:** {check_in}\n"
+                    f"**Check-out:** {check_out}\n\n"
+                    f"**Επόμενη ενέργεια:** Μπορείτε να κάνετε check-in αύριο.",
+                    parse_mode='Markdown'
+                )
+            else:
+                await update.message.reply_text(
+                    f"🎉 **Η βάρδια σας ολοκληρώθηκε!**\n\n"
+                    f"**Ώρα:** {check_in_time}\n\n"
+                    f"**Επόμενη ενέργεια:** Μπορείτε να κάνετε check-in αύριο.",
+                    parse_mode='Markdown'
+                )
+            return
+        
+        # Check if user has a pending action (for active check-in flow)
         user_id = update.effective_user.id
         if user_id in pending_actions:
             existing_action = pending_actions[user_id]
             if existing_action['action'] == 'checkin':
-                # Already in check-in flow - just remind them to send location
+                # Already in check-in flow - send location keyboard again
+                location_keyboard = ReplyKeyboardMarkup([
+                    [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+                    [KeyboardButton("🏠 Πίσω στο μενού")]
+                ], resize_keyboard=True, one_time_keyboard=True)
+                
                 await update.message.reply_text(
                     f"⏳ **Check-in σε εξέλιξη για {worker_name}**\n\n"
-                    "**📱 Στείλτε την τοποθεσία σας** με το κουμπί που εμφανίστηκε.",
+                    "**📱 Στείλτε την τοποθεσία σας** με το κουμπί παρακάτω:\n\n"
+                    "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
+                    reply_markup=location_keyboard,
                     parse_mode='Markdown'
                 )
                 return
@@ -838,15 +887,63 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
 async def handle_persistent_checkout(update: Update, context, worker_name: str):
     """Handle check-out from persistent keyboard"""
     try:
-        # Check if user already has a pending action
+        # Get sheets service
+        sheets_service = context.bot_data.get('sheets_service')
+        if not sheets_service:
+            await update.message.reply_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
+            return
+        
+        # Check current attendance status from Google Sheets (not memory)
+        attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
+        current_status = attendance_status['status']
+        
+        # If not checked in today, can't check out
+        if current_status == 'NOT_CHECKED_IN':
+            await update.message.reply_text(
+                f"❌ **Δεν μπορείτε να κάνετε check-out!**\n\n"
+                f"**Πρέπει πρώτα να κάνετε check-in.**\n\n"
+                f"**Επόμενη ενέργεια:** Πατήστε ✅ Check In για να ξεκινήσετε τη βάρδια.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # If already completed today, show completion status
+        elif current_status == 'COMPLETE':
+            check_in_time = attendance_status['time']
+            if '-' in check_in_time:
+                check_in, check_out = check_in_time.split('-')
+                await update.message.reply_text(
+                    f"🎉 **Η βάρδια σας ολοκληρώθηκε!**\n\n"
+                    f"**Check-in:** {check_in}\n"
+                    f"**Check-out:** {check_out}\n\n"
+                    f"**Επόμενη ενέργεια:** Μπορείτε να κάνετε check-in αύριο.",
+                    parse_mode='Markdown'
+                )
+            else:
+                await update.message.reply_text(
+                    f"🎉 **Η βάρδια σας ολοκληρώθηκε!**\n\n"
+                    f"**Ώρα:** {check_in_time}\n\n"
+                    f"**Επόμενη ενέργεια:** Μπορείτε να κάνετε check-in αύριο.",
+                    parse_mode='Markdown'
+                )
+            return
+        
+        # Check if user has a pending action (for active check-out flow)
         user_id = update.effective_user.id
         if user_id in pending_actions:
             existing_action = pending_actions[user_id]
             if existing_action['action'] == 'checkout':
-                # Already in check-out flow - just remind them to send location
+                # Already in check-out flow - send location keyboard again
+                location_keyboard = ReplyKeyboardMarkup([
+                    [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+                    [KeyboardButton("🏠 Πίσω στο μενού")]
+                ], resize_keyboard=True, one_time_keyboard=True)
+                
                 await update.message.reply_text(
                     f"⏳ **Check-out σε εξέλιξη για {worker_name}**\n\n"
-                    "**📱 Στείλτε την τοποθεσία σας** με το κουμπί που εμφανίστηκε.",
+                    "**📱 Στείλτε την τοποθεσία σας** με το κουμπί παρακάτω:\n\n"
+                    "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
+                    reply_markup=location_keyboard,
                     parse_mode='Markdown'
                 )
                 return
