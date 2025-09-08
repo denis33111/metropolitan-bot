@@ -829,6 +829,9 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
         
         # No need to check pending_actions - we use Google Sheets data instead
         
+        # Get user ID for pending actions
+        user_id = update.effective_user.id
+        
         # Create location request keyboard
         location_keyboard = ReplyKeyboardMarkup([
             [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
