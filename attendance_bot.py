@@ -827,32 +827,7 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
                 )
             return
         
-        # Check if user has a pending action (for active check-in flow)
-        user_id = update.effective_user.id
-        if user_id in pending_actions:
-            existing_action = pending_actions[user_id]
-            if existing_action['action'] == 'checkin':
-                # Already in check-in flow - send location keyboard again
-                location_keyboard = ReplyKeyboardMarkup([
-                    [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
-                    [KeyboardButton("🏠 Πίσω στο μενού")]
-                ], resize_keyboard=True, one_time_keyboard=True)
-                
-                await update.message.reply_text(
-                    f"⏳ **Check-in σε εξέλιξη για {worker_name}**\n\n"
-                    "**📱 Στείλτε την τοποθεσία σας** με το κουμπί παρακάτω:\n\n"
-                    "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
-                    reply_markup=location_keyboard,
-                    parse_mode='Markdown'
-                )
-                return
-            elif existing_action['action'] == 'checkout':
-                await update.message.reply_text(
-                    f"⚠️ **Έχετε ήδη ένα check-out σε εξέλιξη**\n\n"
-                    "**🔄 Περιμένετε να ολοκληρωθεί το check-out πριν κάνετε check-in.**",
-                    parse_mode='Markdown'
-                )
-                return
+        # No need to check pending_actions - we use Google Sheets data instead
         
         # Create location request keyboard
         location_keyboard = ReplyKeyboardMarkup([
@@ -860,7 +835,7 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
             [KeyboardButton("🏠 Πίσω στο μενού")]
         ], resize_keyboard=True, one_time_keyboard=True)
         
-        # Store check-in request in global pending_actions
+        # Store check-in request in global pending_actions (for location verification)
         import pytz
         greece_tz = pytz.timezone('Europe/Athens')
         pending_actions[user_id] = {
