@@ -70,7 +70,10 @@ class GoogleSheetsService:
         import pytz
         greece_tz = pytz.timezone('Europe/Athens')
         now = datetime.now(greece_tz)
-        return f"{now.month:02d}_{now.year}"
+        sheet_name = f"{now.month:02d}_{now.year}"
+        logger.info(f"🔍 DEBUG SHEET: Current sheet name: {sheet_name}")
+        logger.info(f"🔍 DEBUG SHEET: Spreadsheet ID: {self.spreadsheet_id}")
+        return sheet_name
     
     def get_today_column_letter(self) -> str:
         """Get today's column letter (B=1st, C=2nd, etc.)"""
@@ -400,6 +403,7 @@ class GoogleSheetsService:
             cell_range = f"{sheet_name}!{today_col}{worker_row}"
             
             logger.info(f"🔍 DEBUG ATTENDANCE: Reading cell {cell_range} for worker {worker_name}")
+            logger.info(f"🔍 DEBUG ATTENDANCE: Full spreadsheet URL: https://docs.google.com/spreadsheets/d/{self.spreadsheet_id}")
             
             # Read cell value
             result = self.service.spreadsheets().values().get(
