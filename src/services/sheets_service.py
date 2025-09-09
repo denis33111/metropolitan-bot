@@ -85,16 +85,22 @@ class GoogleSheetsService:
         """Get today's column letter (B=1st, C=2nd, etc.)"""
         import pytz
         greece_tz = pytz.timezone('Europe/Athens')
-        day = datetime.now(greece_tz).day
+        now = datetime.now(greece_tz)
+        day = now.day
+        logger.info(f"🔍 DEBUG DATE: Current Greece time: {now.strftime('%Y-%m-%d %H:%M:%S')}, Day: {day}")
+        
         # Column A is names, so day 1 = column B, day 2 = column C, etc.
         # Handle days beyond 26 (Z) by using AA, AB, AC, etc.
         if day <= 26:
-            return chr(ord('A') + day)
+            column_letter = chr(ord('A') + day)
         else:
             # For days 27-31, use AA, AB, AC, AD, AE
             first_letter = 'A'
             second_letter = chr(ord('A') + (day - 26))
-            return first_letter + second_letter
+            column_letter = first_letter + second_letter
+        
+        logger.info(f"🔍 DEBUG DATE: Using column letter: {column_letter} for day {day}")
+        return column_letter
     
     async def ensure_monthly_sheet_exists(self) -> bool:
         """Ensure current month's sheet exists, create if needed"""
@@ -394,6 +400,8 @@ class GoogleSheetsService:
             # Get today's column
             today_col = self.get_today_column_letter()
             cell_range = f"{sheet_name}!{today_col}{worker_row}"
+            
+            logger.info(f"🔍 DEBUG CELL: Reading cell range: {cell_range} for worker {worker_name}")
             
             # Read cell value
             self.api_call_count += 1
