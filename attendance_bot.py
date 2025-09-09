@@ -925,17 +925,12 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
         if user_id in pending_actions:
             existing_action = pending_actions[user_id]
             if existing_action['action'] == 'checkout':
-                # Already in check-out flow - send location keyboard again
-                location_keyboard = ReplyKeyboardMarkup([
-                    [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
-                    [KeyboardButton("🏠 Πίσω στο μενού")]
-                ], resize_keyboard=True, one_time_keyboard=True)
-                
+                # Already in check-out flow - show streamlined message
                 await loading_msg.edit_text(
                     f"⏳ **Check-out σε εξέλιξη για {worker_name}**\n\n"
-                    "**📱 Στείλτε την τοποθεσία σας** με το κουμπί παρακάτω:\n\n"
+                    "**Στείλτε την τοποθεσία σας τώρα:**\n\n"
+                    "📱 **Πατήστε το 📍 στο πληκτρολόγιο σας** για να στείλετε τοποθεσία\n\n"
                     "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
-                    reply_markup=location_keyboard,
                     parse_mode='Markdown'
                 )
                 return
