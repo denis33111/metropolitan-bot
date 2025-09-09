@@ -66,15 +66,26 @@ class GoogleSheetsService:
             self.service = None
     
     def get_current_month_sheet_name(self) -> str:
-        """Get current month sheet name in format MM_YYYY based on real Greek timezone"""
+        """Get current month sheet name in format MM_YYYY based on real Greek timezone with smart fallback"""
         import pytz
         greece_tz = pytz.timezone('Europe/Athens')
         now = datetime.now(greece_tz)
-        # Force year to 2025 to match existing sheet
-        sheet_name = f"{now.month:02d}_2025"
+        
+        # Smart year detection with fallback
+        current_year = now.year
+        if current_year < 2024:  # If system clock is way off (e.g., 2020, 2021, 2022, 2023)
+            logger.warning(f"System year {current_year} seems wrong, using 2025 as fallback")
+            year = 2025
+        elif current_year == 2024:  # If system shows 2024 but we're actually in 2025
+            logger.warning(f"System year {current_year} might be wrong, using 2025 as fallback")
+            year = 2025
+        else:  # If year is 2025 or later, use it
+            year = current_year
+            
+        sheet_name = f"{now.month:02d}_{year}"
         logger.info(f"🔍 DEBUG SHEET: Current sheet name: {sheet_name}")
+        logger.info(f"🔍 DEBUG SHEET: System year: {current_year}, Using year: {year}")
         logger.info(f"🔍 DEBUG SHEET: Spreadsheet ID: {self.spreadsheet_id}")
-        logger.info(f"🔍 DEBUG SHEET: System year was: {now.year}, forced to 2025")
         return sheet_name
     
     def get_today_column_letter(self) -> str:
