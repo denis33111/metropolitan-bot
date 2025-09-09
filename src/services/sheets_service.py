@@ -357,14 +357,21 @@ class GoogleSheetsService:
             logger.info(f"🔍 DEBUG UPDATE: Final cell value to write: '{cell_value}'")
             
             # Update cell
-            self.service.spreadsheets().values().update(
-                spreadsheetId=self.spreadsheet_id,
-                range=cell_range,
-                valueInputOption='RAW',
-                body={'values': [[cell_value]]}
-            ).execute()
-            
-            logger.info(f"✅ Updated attendance for {worker_name}: {cell_value}")
+            try:
+                result = self.service.spreadsheets().values().update(
+                    spreadsheetId=self.spreadsheet_id,
+                    range=cell_range,
+                    valueInputOption='RAW',
+                    body={'values': [[cell_value]]}
+                ).execute()
+                
+                logger.info(f"✅ Updated attendance for {worker_name}: {cell_value}")
+                logger.info(f"🔍 DEBUG UPDATE: API response: {result}")
+                
+            except Exception as api_error:
+                logger.error(f"❌ Google Sheets API error: {api_error}")
+                logger.error(f"❌ Failed to update cell {cell_range} with value '{cell_value}'")
+                raise api_error
             return True
             
         except Exception as e:
