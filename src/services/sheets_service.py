@@ -21,16 +21,7 @@ class GoogleSheetsService:
     def __init__(self, spreadsheet_id: str):
         self.spreadsheet_id = spreadsheet_id
         self.service = None
-        self.api_call_count = 0  # Debug: Count API calls
         self.setup_credentials()
-    
-    def get_api_call_count(self) -> int:
-        """Get current API call count for debugging"""
-        return self.api_call_count
-    
-    def reset_api_call_count(self):
-        """Reset API call count for debugging"""
-        self.api_call_count = 0
     
     def setup_credentials(self):
         """Set up Google Sheets API credentials"""
@@ -85,22 +76,16 @@ class GoogleSheetsService:
         """Get today's column letter (B=1st, C=2nd, etc.)"""
         import pytz
         greece_tz = pytz.timezone('Europe/Athens')
-        now = datetime.now(greece_tz)
-        day = now.day
-        logger.info(f"🔍 DEBUG DATE: Current Greece time: {now.strftime('%Y-%m-%d %H:%M:%S')}, Day: {day}")
-        
+        day = datetime.now(greece_tz).day
         # Column A is names, so day 1 = column B, day 2 = column C, etc.
         # Handle days beyond 26 (Z) by using AA, AB, AC, etc.
         if day <= 26:
-            column_letter = chr(ord('A') + day)
+            return chr(ord('A') + day)
         else:
             # For days 27-31, use AA, AB, AC, AD, AE
             first_letter = 'A'
             second_letter = chr(ord('A') + (day - 26))
-            column_letter = first_letter + second_letter
-        
-        logger.info(f"🔍 DEBUG DATE: Using column letter: {column_letter} for day {day}")
-        return column_letter
+            return first_letter + second_letter
     
     async def ensure_monthly_sheet_exists(self) -> bool:
         """Ensure current month's sheet exists, create if needed"""
@@ -364,8 +349,6 @@ class GoogleSheetsService:
                 cell_value = ""
             
             # Update cell
-            self.api_call_count += 1
-            logger.info(f"🔍 DEBUG API: Call #{self.api_call_count} - Updating attendance for {worker_name}: {cell_value}")
             self.service.spreadsheets().values().update(
                 spreadsheetId=self.spreadsheet_id,
                 range=cell_range,
@@ -401,11 +384,7 @@ class GoogleSheetsService:
             today_col = self.get_today_column_letter()
             cell_range = f"{sheet_name}!{today_col}{worker_row}"
             
-            logger.info(f"🔍 DEBUG CELL: Reading cell range: {cell_range} for worker {worker_name}")
-            
             # Read cell value
-            self.api_call_count += 1
-            logger.info(f"🔍 DEBUG API: Call #{self.api_call_count} - Reading attendance status for {worker_name}")
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
                 range=cell_range
@@ -416,19 +395,14 @@ class GoogleSheetsService:
             
             # Determine status
             time = ""  # Initialize time variable
-            logger.info(f"🔍 DEBUG STATUS: Cell value: '{cell_value}' (length: {len(cell_value)})")
-            
             if not cell_value:
                 status = 'NOT_CHECKED_IN'
-                logger.info(f"🔍 DEBUG STATUS: Detected NOT_CHECKED_IN")
             elif cell_value.endswith('-'):
                 status = 'CHECKED_IN'
                 time = cell_value[:-1]  # Remove trailing dash
-                logger.info(f"🔍 DEBUG STATUS: Detected CHECKED_IN, time: '{time}'")
             elif '-' in cell_value:
                 status = 'COMPLETE'
                 time = cell_value
-                logger.info(f"🔍 DEBUG STATUS: Detected COMPLETE, time: '{time}'")
             else:
                 status = 'UNKNOWN'
                 time = cell_value

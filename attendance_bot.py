@@ -145,8 +145,6 @@ async def start_command(update: Update, context):
         attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
         current_status = attendance_status['status']
         
-        logger.info(f"🔍 DEBUG KEYBOARD: Creating keyboard for {worker_name} with status: '{current_status}'")
-        
         # Create smart keyboard based on current status
         smart_keyboard = create_smart_keyboard(worker_name, current_status)
         
@@ -649,9 +647,6 @@ async def complete_checkin(update: Update, context, pending_data: dict, location
             # Get current date in Greece timezone for display
             current_date = datetime.now(greece_tz).strftime("%d/%m/%Y")
             
-            # Get API call count for debugging
-            api_calls = sheets_service.get_api_call_count()
-            
             message = f"""
 ✅ **Check-in επιτυχής!**
 
@@ -659,8 +654,6 @@ async def complete_checkin(update: Update, context, pending_data: dict, location
 **Ημερομηνία:** {current_date}
 
 **Τώρα μπορείτε να κάνετε check-out όταν τελειώσετε τη βάρδια!**
-
-🔍 **Debug:** {api_calls} API calls used
             """
             
             # Send success message with smart keyboard
@@ -712,9 +705,6 @@ async def complete_checkout(update: Update, context, pending_data: dict, locatio
                 # Get current date in Greece timezone for display
                 current_date = datetime.now(greece_tz).strftime("%d/%m/%Y")
                 
-                # Get API call count for debugging
-                api_calls = sheets_service.get_api_call_count()
-                
                 message = f"""
 🚪 **Check-out επιτυχής!**
 
@@ -723,8 +713,6 @@ async def complete_checkout(update: Update, context, pending_data: dict, locatio
 **Ημερομηνία:** {current_date}
 
 **Η βάρδια σας ολοκληρώθηκε! Μπορείτε να κάνετε check-in αύριο.**
-
-🔍 **Debug:** {api_calls} API calls used
                 """
                 
                 # Send success message with smart keyboard
@@ -806,9 +794,6 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
             await loading_msg.edit_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
             return
         
-        # Reset API call count for this operation
-        sheets_service.reset_api_call_count()
-        
         # Check current attendance status from Google Sheets (not memory)
         attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
         current_status = attendance_status['status']
@@ -859,12 +844,24 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
             'timestamp': datetime.now(greece_tz)
         }
         
-        # Show streamlined location request (no button needed)
+        # Create location request keyboard (immediate request)
+        location_keyboard = ReplyKeyboardMarkup([
+            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+            [KeyboardButton("🏠 Πίσω στο μενού")]
+        ], resize_keyboard=True, one_time_keyboard=True)
+        
+        # Show immediate location request message (send new message for keyboard)
         await loading_msg.edit_text(
             f"📍 **Check-in για {worker_name}**\n\n"
             "**Στείλτε την τοποθεσία σας τώρα:**\n\n"
-            "📱 **Πατήστε το 📍 στο πληκτρολόγιο σας** για να στείλετε τοποθεσία\n\n"
             "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
+            parse_mode='Markdown'
+        )
+        
+        # Send location keyboard in a separate message
+        await update.message.reply_text(
+            "**Πατήστε το κουμπί παρακάτω για να στείλετε την τοποθεσία σας:**",
+            reply_markup=location_keyboard,
             parse_mode='Markdown'
         )
         
@@ -883,9 +880,6 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
         if not sheets_service:
             await loading_msg.edit_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
             return
-        
-        # Reset API call count for this operation
-        sheets_service.reset_api_call_count()
         
         # Check current attendance status from Google Sheets (not memory)
         attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
@@ -927,12 +921,17 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
         if user_id in pending_actions:
             existing_action = pending_actions[user_id]
             if existing_action['action'] == 'checkout':
-                # Already in check-out flow - show streamlined message
+                # Already in check-out flow - send location keyboard again
+                location_keyboard = ReplyKeyboardMarkup([
+                    [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+                    [KeyboardButton("🏠 Πίσω στο μενού")]
+                ], resize_keyboard=True, one_time_keyboard=True)
+                
                 await loading_msg.edit_text(
                     f"⏳ **Check-out σε εξέλιξη για {worker_name}**\n\n"
-                    "**Στείλτε την τοποθεσία σας τώρα:**\n\n"
-                    "📱 **Πατήστε το 📍 στο πληκτρολόγιο σας** για να στείλετε τοποθεσία\n\n"
+                    "**📱 Στείλτε την τοποθεσία σας** με το κουμπί παρακάτω:\n\n"
                     "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
+                    reply_markup=location_keyboard,
                     parse_mode='Markdown'
                 )
                 return
@@ -953,12 +952,24 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
             'timestamp': datetime.now(greece_tz)
         }
         
-        # Show streamlined location request (no button needed)
+        # Create location request keyboard (immediate request)
+        location_keyboard = ReplyKeyboardMarkup([
+            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+            [KeyboardButton("🏠 Πίσω στο μενού")]
+        ], resize_keyboard=True, one_time_keyboard=True)
+        
+        # Show immediate location request message (send new message for keyboard)
         await loading_msg.edit_text(
             f"🚪 **Check-out για {worker_name}**\n\n"
             "**Στείλτε την τοποθεσία σας τώρα:**\n\n"
-            "📱 **Πατήστε το 📍 στο πληκτρολόγιο σας** για να στείλετε τοποθεσία\n\n"
             "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
+            parse_mode='Markdown'
+        )
+        
+        # Send location keyboard in a separate message
+        await update.message.reply_text(
+            "**Πατήστε το κουμπί παρακάτω για να στείλετε την τοποθεσία σας:**",
+            reply_markup=location_keyboard,
             parse_mode='Markdown'
         )
         
