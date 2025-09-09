@@ -66,12 +66,11 @@ class GoogleSheetsService:
             self.service = None
     
     def get_current_month_sheet_name(self) -> str:
-        """Get current month sheet name in format MM_YYYY"""
+        """Get current month sheet name in format MM_YYYY based on real Greek timezone"""
         import pytz
         greece_tz = pytz.timezone('Europe/Athens')
         now = datetime.now(greece_tz)
-        # Force year to 2024 (system clock is set to 2025 incorrectly)
-        return f"{now.month:02d}_2024"
+        return f"{now.month:02d}_{now.year}"
     
     def get_today_column_letter(self) -> str:
         """Get today's column letter (B=1st, C=2nd, etc.)"""
