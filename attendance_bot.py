@@ -832,12 +832,6 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
         # Get user ID for pending actions
         user_id = update.effective_user.id
         
-        # Create location request keyboard
-        location_keyboard = ReplyKeyboardMarkup([
-            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
-            [KeyboardButton("🏠 Πίσω στο μενού")]
-        ], resize_keyboard=True, one_time_keyboard=True)
-        
         # Store check-in request in global pending_actions (for location verification)
         import pytz
         greece_tz = pytz.timezone('Europe/Athens')
@@ -846,13 +840,17 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
             'action': 'checkin',
             'timestamp': datetime.now(greece_tz)
         }
-        logger.info(f"🔍 DEBUG: Stored check-in pending action for user {user_id}: {pending_actions[user_id]}")
-        logger.info(f"🔍 DEBUG: All pending actions: {pending_actions}")
         
-        # Show minimal location request message
+        # Create location request keyboard (immediate request)
+        location_keyboard = ReplyKeyboardMarkup([
+            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+            [KeyboardButton("🏠 Πίσω στο μενού")]
+        ], resize_keyboard=True, one_time_keyboard=True)
+        
+        # Show immediate location request message
         await update.message.reply_text(
             f"📍 **Check-in για {worker_name}**\n\n"
-            "**Πατήστε το κουμπί τοποθεσίας παρακάτω:**\n\n"
+            "**Στείλτε την τοποθεσία σας τώρα:**\n\n"
             "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
             reply_markup=location_keyboard,
             parse_mode='Markdown'
@@ -933,12 +931,6 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
                 )
                 return
         
-        # Create location request keyboard
-        location_keyboard = ReplyKeyboardMarkup([
-            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
-            [KeyboardButton("🏠 Πίσω στο μενού")]
-        ], resize_keyboard=True, one_time_keyboard=True)
-        
         # Store check-out request in global pending_actions
         import pytz
         greece_tz = pytz.timezone('Europe/Athens')
@@ -947,13 +939,17 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
             'action': 'checkout',
             'timestamp': datetime.now(greece_tz)
         }
-        logger.info(f"🔍 DEBUG: Stored check-out pending action for user {user_id}: {pending_actions[user_id]}")
-        logger.info(f"🔍 DEBUG: All pending actions: {pending_actions}")
         
-        # Show minimal location request message
+        # Create location request keyboard (immediate request)
+        location_keyboard = ReplyKeyboardMarkup([
+            [KeyboardButton("📍 Στείλε την τοποθεσία μου", request_location=True)],
+            [KeyboardButton("🏠 Πίσω στο μενού")]
+        ], resize_keyboard=True, one_time_keyboard=True)
+        
+        # Show immediate location request message
         await update.message.reply_text(
             f"🚪 **Check-out για {worker_name}**\n\n"
-            "**Πατήστε το κουμπί τοποθεσίας παρακάτω:**\n\n"
+            "**Στείλτε την τοποθεσία σας τώρα:**\n\n"
             "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
             reply_markup=location_keyboard,
             parse_mode='Markdown'
