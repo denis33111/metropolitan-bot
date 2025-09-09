@@ -70,9 +70,11 @@ class GoogleSheetsService:
         import pytz
         greece_tz = pytz.timezone('Europe/Athens')
         now = datetime.now(greece_tz)
-        sheet_name = f"{now.month:02d}_{now.year}"
+        # Force year to 2025 to match existing sheet
+        sheet_name = f"{now.month:02d}_2025"
         logger.info(f"🔍 DEBUG SHEET: Current sheet name: {sheet_name}")
         logger.info(f"🔍 DEBUG SHEET: Spreadsheet ID: {self.spreadsheet_id}")
+        logger.info(f"🔍 DEBUG SHEET: System year was: {now.year}, forced to 2025")
         return sheet_name
     
     def get_today_column_letter(self) -> str:
