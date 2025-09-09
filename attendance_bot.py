@@ -145,6 +145,8 @@ async def start_command(update: Update, context):
         attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
         current_status = attendance_status['status']
         
+        logger.info(f"🔍 DEBUG KEYBOARD: Creating keyboard for {worker_name} with status: '{current_status}'")
+        
         # Create smart keyboard based on current status
         smart_keyboard = create_smart_keyboard(worker_name, current_status)
         

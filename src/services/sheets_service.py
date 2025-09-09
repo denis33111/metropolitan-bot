@@ -408,14 +408,19 @@ class GoogleSheetsService:
             
             # Determine status
             time = ""  # Initialize time variable
+            logger.info(f"🔍 DEBUG STATUS: Cell value: '{cell_value}' (length: {len(cell_value)})")
+            
             if not cell_value:
                 status = 'NOT_CHECKED_IN'
+                logger.info(f"🔍 DEBUG STATUS: Detected NOT_CHECKED_IN")
             elif cell_value.endswith('-'):
                 status = 'CHECKED_IN'
                 time = cell_value[:-1]  # Remove trailing dash
+                logger.info(f"🔍 DEBUG STATUS: Detected CHECKED_IN, time: '{time}'")
             elif '-' in cell_value:
                 status = 'COMPLETE'
                 time = cell_value
+                logger.info(f"🔍 DEBUG STATUS: Detected COMPLETE, time: '{time}'")
             else:
                 status = 'UNKNOWN'
                 time = cell_value
