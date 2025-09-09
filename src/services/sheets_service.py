@@ -81,12 +81,15 @@ class GoogleSheetsService:
         # Column A is names, so day 1 = column B, day 2 = column C, etc.
         # Handle days beyond 26 (Z) by using AA, AB, AC, etc.
         if day <= 26:
-            return chr(ord('A') + day)
+            column_letter = chr(ord('A') + day)
         else:
             # For days 27-31, use AA, AB, AC, AD, AE
             first_letter = 'A'
             second_letter = chr(ord('A') + (day - 26))
-            return first_letter + second_letter
+            column_letter = first_letter + second_letter
+        
+        logger.info(f"🔍 DEBUG COLUMN: Today is day {day}, using column {column_letter}")
+        return column_letter
     
     async def ensure_monthly_sheet_exists(self) -> bool:
         """Ensure current month's sheet exists, create if needed"""
@@ -341,6 +344,9 @@ class GoogleSheetsService:
             today_col = self.get_today_column_letter()
             cell_range = f"{sheet_name}!{today_col}{worker_row}"
             
+            logger.info(f"🔍 DEBUG UPDATE: Updating cell {cell_range} for worker {worker_name}")
+            logger.info(f"🔍 DEBUG UPDATE: Check-in time: {check_in_time}, Check-out time: {check_out_time}")
+            
             # Prepare cell value
             if check_in_time and check_out_time:
                 cell_value = f"{check_in_time}-{check_out_time}"
@@ -348,6 +354,8 @@ class GoogleSheetsService:
                 cell_value = f"{check_in_time}-"
             else:
                 cell_value = ""
+            
+            logger.info(f"🔍 DEBUG UPDATE: Final cell value to write: '{cell_value}'")
             
             # Update cell
             self.service.spreadsheets().values().update(
@@ -385,6 +393,8 @@ class GoogleSheetsService:
             today_col = self.get_today_column_letter()
             cell_range = f"{sheet_name}!{today_col}{worker_row}"
             
+            logger.info(f"🔍 DEBUG ATTENDANCE: Reading cell {cell_range} for worker {worker_name}")
+            
             # Read cell value
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
@@ -394,19 +404,27 @@ class GoogleSheetsService:
             values = result.get('values', [])
             cell_value = values[0][0] if values and values[0] else ""
             
+            logger.info(f"🔍 DEBUG ATTENDANCE: Cell value: '{cell_value}' (length: {len(cell_value)})")
+            
             # Determine status
             time = ""  # Initialize time variable
             if not cell_value:
                 status = 'NOT_CHECKED_IN'
+                logger.info(f"🔍 DEBUG ATTENDANCE: Status = NOT_CHECKED_IN (empty cell)")
             elif cell_value.endswith('-'):
                 status = 'CHECKED_IN'
                 time = cell_value[:-1]  # Remove trailing dash
+                logger.info(f"🔍 DEBUG ATTENDANCE: Status = CHECKED_IN (ends with -), time = '{time}'")
             elif '-' in cell_value:
                 status = 'COMPLETE'
                 time = cell_value
+                logger.info(f"🔍 DEBUG ATTENDANCE: Status = COMPLETE (contains -), time = '{time}'")
             else:
                 status = 'UNKNOWN'
                 time = cell_value
+                logger.info(f"🔍 DEBUG ATTENDANCE: Status = UNKNOWN (unexpected format), time = '{time}'")
+            
+            logger.info(f"🔍 DEBUG ATTENDANCE: Final result - status: {status}, time: '{time}'")
             
             return {
                 'status': status,
