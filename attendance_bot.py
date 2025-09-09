@@ -105,8 +105,6 @@ async def periodic_cleanup(context: ContextTypes.DEFAULT_TYPE):
 def create_smart_keyboard(worker_name: str, current_status: str) -> ReplyKeyboardMarkup:
     """Create smart keyboard based on current attendance status"""
     
-    logger.info(f"🔍 DEBUG KEYBOARD: Creating keyboard for {worker_name} with status: '{current_status}'")
-    
     if current_status == 'CHECKED_IN':
         # Worker is checked in, show only check-out button
         keyboard = [
@@ -137,20 +135,15 @@ async def start_command(update: Update, context):
     user = update.effective_user
     
     # Check if worker already exists
-    logger.info(f"🔍 DEBUG START: Looking for worker with telegram_id: {user.id}")
     existing_worker = await sheets_service.find_worker_by_telegram_id(user.id)
-    logger.info(f"🔍 DEBUG START: Worker lookup result: {existing_worker}")
     
     if existing_worker:
         # Existing worker - show smart keyboard based on current status
         worker_name = existing_worker['name']
-        logger.info(f"🔍 DEBUG START: Found existing worker: {worker_name}")
         
         # Get current attendance status
-        logger.info(f"🔍 DEBUG START: Calling get_worker_attendance_status for {worker_name}")
         attendance_status = await sheets_service.get_worker_attendance_status(worker_name)
         current_status = attendance_status['status']
-        logger.info(f"🔍 DEBUG START: Attendance status result: {attendance_status}")
         
         # Create smart keyboard based on current status
         smart_keyboard = create_smart_keyboard(worker_name, current_status)

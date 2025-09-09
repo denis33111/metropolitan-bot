@@ -384,9 +384,6 @@ class GoogleSheetsService:
             today_col = self.get_today_column_letter()
             cell_range = f"{sheet_name}!{today_col}{worker_row}"
             
-            # DEBUG: Log which cell we're reading
-            logger.info(f"🔍 DEBUG STATUS: Reading cell {cell_range} for worker {worker_name} (row {worker_row})")
-            
             # Read cell value
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
@@ -396,26 +393,19 @@ class GoogleSheetsService:
             values = result.get('values', [])
             cell_value = values[0][0] if values and values[0] else ""
             
-            # DEBUG: Log the actual cell value and its properties
-            logger.info(f"🔍 DEBUG STATUS: Worker={worker_name}, Cell={cell_range}, RawValue='{cell_value}', Length={len(cell_value)}, Repr={repr(cell_value)}")
-            
             # Determine status
             time = ""  # Initialize time variable
             if not cell_value:
                 status = 'NOT_CHECKED_IN'
-                logger.info(f"🔍 DEBUG STATUS: Empty cell -> NOT_CHECKED_IN")
             elif cell_value.endswith('-'):
                 status = 'CHECKED_IN'
                 time = cell_value[:-1]  # Remove trailing dash
-                logger.info(f"🔍 DEBUG STATUS: Ends with dash -> CHECKED_IN, time='{time}'")
             elif '-' in cell_value:
                 status = 'COMPLETE'
                 time = cell_value
-                logger.info(f"🔍 DEBUG STATUS: Contains dash -> COMPLETE, time='{time}'")
             else:
                 status = 'UNKNOWN'
                 time = cell_value
-                logger.info(f"🔍 DEBUG STATUS: Unknown format -> UNKNOWN, time='{time}'")
             
             return {
                 'status': status,
