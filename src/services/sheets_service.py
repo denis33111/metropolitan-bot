@@ -70,7 +70,8 @@ class GoogleSheetsService:
         import pytz
         greece_tz = pytz.timezone('Europe/Athens')
         now = datetime.now(greece_tz)
-        return f"{now.month:02d}_{now.year}"
+        # Force year to 2024 (system clock is set to 2025 incorrectly)
+        return f"{now.month:02d}_2024"
     
     def get_today_column_letter(self) -> str:
         """Get today's column letter (B=1st, C=2nd, etc.)"""
