@@ -21,7 +21,16 @@ class GoogleSheetsService:
     def __init__(self, spreadsheet_id: str):
         self.spreadsheet_id = spreadsheet_id
         self.service = None
+        self.api_call_count = 0  # Debug: Count API calls
         self.setup_credentials()
+    
+    def get_api_call_count(self) -> int:
+        """Get current API call count for debugging"""
+        return self.api_call_count
+    
+    def reset_api_call_count(self):
+        """Reset API call count for debugging"""
+        self.api_call_count = 0
     
     def setup_credentials(self):
         """Set up Google Sheets API credentials"""
@@ -349,6 +358,8 @@ class GoogleSheetsService:
                 cell_value = ""
             
             # Update cell
+            self.api_call_count += 1
+            logger.info(f"🔍 DEBUG API: Call #{self.api_call_count} - Updating attendance for {worker_name}: {cell_value}")
             self.service.spreadsheets().values().update(
                 spreadsheetId=self.spreadsheet_id,
                 range=cell_range,
@@ -385,6 +396,8 @@ class GoogleSheetsService:
             cell_range = f"{sheet_name}!{today_col}{worker_row}"
             
             # Read cell value
+            self.api_call_count += 1
+            logger.info(f"🔍 DEBUG API: Call #{self.api_call_count} - Reading attendance status for {worker_name}")
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
                 range=cell_range
