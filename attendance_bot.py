@@ -785,10 +785,13 @@ async def handle_persistent_keyboard(update: Update, context):
 async def handle_persistent_checkin(update: Update, context, worker_name: str):
     """Handle check-in from persistent keyboard"""
     try:
+        # Show loading message immediately
+        loading_msg = await update.message.reply_text("⏳ **Επεξεργασία...**\n\nΠαρακαλώ περιμένετε...")
+        
         # Get sheets service
         sheets_service = context.bot_data.get('sheets_service')
         if not sheets_service:
-            await update.message.reply_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
+            await loading_msg.edit_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
             return
         
         # Check current attendance status from Google Sheets (not memory)
@@ -798,7 +801,7 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
         # If already checked in today, show current status
         if current_status == 'CHECKED_IN':
             check_in_time = attendance_status['time']
-            await update.message.reply_text(
+            await loading_msg.edit_text(
                 f"✅ **Έχετε ήδη κάνει check-in σήμερα!**\n\n"
                 f"**Ώρα check-in:** {check_in_time}\n\n"
                 f"**Επόμενη ενέργεια:** Πατήστε 🚪 Check Out όταν τελειώσετε τη βάρδια.",
@@ -811,7 +814,7 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
             check_in_time = attendance_status['time']
             if '-' in check_in_time:
                 check_in, check_out = check_in_time.split('-')
-                await update.message.reply_text(
+                await loading_msg.edit_text(
                     f"🎉 **Η βάρδια σας ολοκληρώθηκε!**\n\n"
                     f"**Check-in:** {check_in}\n"
                     f"**Check-out:** {check_out}\n\n"
@@ -819,7 +822,7 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
                     parse_mode='Markdown'
                 )
             else:
-                await update.message.reply_text(
+                await loading_msg.edit_text(
                     f"🎉 **Η βάρδια σας ολοκληρώθηκε!**\n\n"
                     f"**Ώρα:** {check_in_time}\n\n"
                     f"**Επόμενη ενέργεια:** Μπορείτε να κάνετε check-in αύριο.",
@@ -848,7 +851,7 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
         ], resize_keyboard=True, one_time_keyboard=True)
         
         # Show immediate location request message
-        await update.message.reply_text(
+        await loading_msg.edit_text(
             f"📍 **Check-in για {worker_name}**\n\n"
             "**Στείλτε την τοποθεσία σας τώρα:**\n\n"
             "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
@@ -863,10 +866,13 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
 async def handle_persistent_checkout(update: Update, context, worker_name: str):
     """Handle check-out from persistent keyboard"""
     try:
+        # Show loading message immediately
+        loading_msg = await update.message.reply_text("⏳ **Επεξεργασία...**\n\nΠαρακαλώ περιμένετε...")
+        
         # Get sheets service
         sheets_service = context.bot_data.get('sheets_service')
         if not sheets_service:
-            await update.message.reply_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
+            await loading_msg.edit_text("❌ Σφάλμα: Δεν είναι διαθέσιμη η υπηρεσία Google Sheets.")
             return
         
         # Check current attendance status from Google Sheets (not memory)
@@ -875,7 +881,7 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
         
         # If not checked in today, can't check out
         if current_status == 'NOT_CHECKED_IN':
-            await update.message.reply_text(
+            await loading_msg.edit_text(
                 f"❌ **Δεν μπορείτε να κάνετε check-out!**\n\n"
                 f"**Πρέπει πρώτα να κάνετε check-in.**\n\n"
                 f"**Επόμενη ενέργεια:** Πατήστε ✅ Check In για να ξεκινήσετε τη βάρδια.",
@@ -888,7 +894,7 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
             check_in_time = attendance_status['time']
             if '-' in check_in_time:
                 check_in, check_out = check_in_time.split('-')
-                await update.message.reply_text(
+                await loading_msg.edit_text(
                     f"🎉 **Η βάρδια σας ολοκληρώθηκε!**\n\n"
                     f"**Check-in:** {check_in}\n"
                     f"**Check-out:** {check_out}\n\n"
@@ -896,7 +902,7 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
                     parse_mode='Markdown'
                 )
             else:
-                await update.message.reply_text(
+                await loading_msg.edit_text(
                     f"🎉 **Η βάρδια σας ολοκληρώθηκε!**\n\n"
                     f"**Ώρα:** {check_in_time}\n\n"
                     f"**Επόμενη ενέργεια:** Μπορείτε να κάνετε check-in αύριο.",
@@ -915,7 +921,7 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
                     [KeyboardButton("🏠 Πίσω στο μενού")]
                 ], resize_keyboard=True, one_time_keyboard=True)
                 
-                await update.message.reply_text(
+                await loading_msg.edit_text(
                     f"⏳ **Check-out σε εξέλιξη για {worker_name}**\n\n"
                     "**📱 Στείλτε την τοποθεσία σας** με το κουμπί παρακάτω:\n\n"
                     "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
@@ -924,7 +930,7 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
                 )
                 return
             elif existing_action['action'] == 'checkin':
-                await update.message.reply_text(
+                await loading_msg.edit_text(
                     f"⚠️ **Έχετε ήδη ένα check-in σε εξέλιξη**\n\n"
                     "**🔄 Περιμένετε να ολοκληρωθεί το check-in πριν κάνετε check-out.**",
                     parse_mode='Markdown'
@@ -947,7 +953,7 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
         ], resize_keyboard=True, one_time_keyboard=True)
         
         # Show immediate location request message
-        await update.message.reply_text(
+        await loading_msg.edit_text(
             f"🚪 **Check-out για {worker_name}**\n\n"
             "**Στείλτε την τοποθεσία σας τώρα:**\n\n"
             "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
