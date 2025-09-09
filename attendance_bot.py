@@ -850,11 +850,17 @@ async def handle_persistent_checkin(update: Update, context, worker_name: str):
             [KeyboardButton("🏠 Πίσω στο μενού")]
         ], resize_keyboard=True, one_time_keyboard=True)
         
-        # Show immediate location request message
+        # Show immediate location request message (send new message for keyboard)
         await loading_msg.edit_text(
             f"📍 **Check-in για {worker_name}**\n\n"
             "**Στείλτε την τοποθεσία σας τώρα:**\n\n"
             "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
+            parse_mode='Markdown'
+        )
+        
+        # Send location keyboard in a separate message
+        await update.message.reply_text(
+            "**Πατήστε το κουμπί παρακάτω για να στείλετε την τοποθεσία σας:**",
             reply_markup=location_keyboard,
             parse_mode='Markdown'
         )
@@ -952,11 +958,17 @@ async def handle_persistent_checkout(update: Update, context, worker_name: str):
             [KeyboardButton("🏠 Πίσω στο μενού")]
         ], resize_keyboard=True, one_time_keyboard=True)
         
-        # Show immediate location request message
+        # Show immediate location request message (send new message for keyboard)
         await loading_msg.edit_text(
             f"🚪 **Check-out για {worker_name}**\n\n"
             "**Στείλτε την τοποθεσία σας τώρα:**\n\n"
             "⚠️ Πρέπει να είστε μέσα σε 300m από το γραφείο",
+            parse_mode='Markdown'
+        )
+        
+        # Send location keyboard in a separate message
+        await update.message.reply_text(
+            "**Πατήστε το κουμπί παρακάτω για να στείλετε την τοποθεσία σας:**",
             reply_markup=location_keyboard,
             parse_mode='Markdown'
         )
